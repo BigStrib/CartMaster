@@ -400,12 +400,50 @@ function createPlanItem(item, idx) {
 
     div.querySelector('[data-action="delete-plan"]').addEventListener('click', () => {
         const linked = Store.cartItems.find(c => c.planId === item.id);
-        const extra = linked ? ' This will also remove it from your shopping cart.' : '';
-        showConfirm(
-            'Remove Item?',
-            `Remove "${item.name}" from your planning list?${extra}`,
-            () => deletePlanItem(item.id)
-        );
+
+        if (linked) {
+            showDeleteChoiceConfirm(
+                'Remove Item',
+                `"${item.name}" is also in your shopping cart. What would you like to do?`,
+                {
+                    planOnly: {
+                        label: 'Remove from Plan Only',
+                        icon: 'fa-clipboard-list',
+                        callback: () => {
+                            Store.planItems = Store.planItems.filter(i => i.id !== item.id);
+                            // Unlink the cart item so it becomes standalone
+                            const cartItem = Store.cartItems.find(c => c.planId === item.id);
+                            if (cartItem) cartItem.planId = null;
+                            Store.save();
+                            renderAll();
+                            showToast(`"${item.name}" removed from plan`, 'success');
+                        }
+                    },
+                    both: {
+                        label: 'Remove from Both',
+                        icon: 'fa-trash-can',
+                        callback: () => {
+                            Store.cartItems = Store.cartItems.filter(c => c.planId !== item.id);
+                            Store.planItems = Store.planItems.filter(i => i.id !== item.id);
+                            Store.save();
+                            renderAll();
+                            showToast(`"${item.name}" removed from plan and cart`, 'success');
+                        }
+                    }
+                }
+            );
+        } else {
+            showConfirm(
+                'Remove Item?',
+                `Remove "${item.name}" from your planning list?`,
+                () => {
+                    Store.planItems = Store.planItems.filter(i => i.id !== item.id);
+                    Store.save();
+                    renderAll();
+                    showToast(`"${item.name}" removed`, 'success');
+                }
+            );
+        }
     });
 
     return div;
@@ -531,11 +569,50 @@ function createCartItem(item, idx) {
     });
 
     div.querySelector('[data-action="delete-cart"]').addEventListener('click', () => {
-        showConfirm(
-            'Remove from Cart?',
-            `Remove "${item.name}" from your shopping cart?`,
-            () => deleteCartItem(item.id)
-        );
+        const linkedPlan = item.planId
+            ? Store.planItems.find(p => p.id === item.planId)
+            : null;
+
+        if (linkedPlan) {
+            showDeleteChoiceConfirm(
+                'Remove Item',
+                `"${item.name}" is also in your plan list. What would you like to do?`,
+                {
+                    planOnly: {
+                        label: 'Remove from Cart Only',
+                        icon: 'fa-cart-shopping',
+                        callback: () => {
+                            Store.cartItems = Store.cartItems.filter(i => i.id !== item.id);
+                            Store.save();
+                            renderAll();
+                            showToast(`"${item.name}" removed from cart`, 'success');
+                        }
+                    },
+                    both: {
+                        label: 'Remove from Both',
+                        icon: 'fa-trash-can',
+                        callback: () => {
+                            Store.planItems = Store.planItems.filter(p => p.id !== linkedPlan.id);
+                            Store.cartItems = Store.cartItems.filter(i => i.id !== item.id);
+                            Store.save();
+                            renderAll();
+                            showToast(`"${item.name}" removed from cart and plan`, 'success');
+                        }
+                    }
+                }
+            );
+        } else {
+            showConfirm(
+                'Remove from Cart?',
+                `Remove "${item.name}" from your shopping cart?`,
+                () => {
+                    Store.cartItems = Store.cartItems.filter(i => i.id !== item.id);
+                    Store.save();
+                    renderAll();
+                    showToast(`"${item.name}" removed from cart`, 'success');
+                }
+            );
+        }
     });
 
     return div;
@@ -618,8 +695,8 @@ function openModal(mode, prefillName, itemId) {
                         <label class="form-label">Category</label>
                         <select class="form-select" id="inputCategory">
                             ${CATEGORIES.map(c =>
-                                `<option value="${c.id}"${c.id === item.category ? ' selected' : ''}>${c.label}</option>`
-                            ).join('')}
+                `<option value="${c.id}"${c.id === item.category ? ' selected' : ''}>${c.label}</option>`
+            ).join('')}
                         </select>
                     </div>
                     <div class="form-group">
@@ -699,8 +776,8 @@ function openModal(mode, prefillName, itemId) {
                     <label class="form-label">Category</label>
                     <select class="form-select" id="inputCategory">
                         ${CATEGORIES.map(c =>
-                            `<option value="${c.id}"${c.id === item.category ? ' selected' : ''}>${c.label}</option>`
-                        ).join('')}
+                `<option value="${c.id}"${c.id === item.category ? ' selected' : ''}>${c.label}</option>`
+            ).join('')}
                     </select>
                 </div>
             `;
@@ -905,18 +982,64 @@ function showConfirm(title, message, callback) {
     DOM.confirmTitle.textContent = title;
     DOM.confirmMessage.textContent = message;
     confirmCallback = callback;
-    DOM.confirmOverlay.classList.add('show');
 
-    DOM.confirmYes.onclick = () => {
+    // Reset to standard two-button layout
+    const actionsContainer = DOM.confirmOverlay.querySelector('.confirm-actions');
+    actionsContainer.innerHTML = `
+        <button class="confirm-btn no" id="confirmNo">Cancel</button>
+        <button class="confirm-btn yes" id="confirmYes">Delete</button>
+    `;
+
+    // Re-bind the new buttons
+    actionsContainer.querySelector('#confirmNo').addEventListener('click', closeConfirm);
+    actionsContainer.querySelector('#confirmYes').addEventListener('click', () => {
         if (confirmCallback) confirmCallback();
         closeConfirm();
-    };
+    });
+
+    DOM.confirmOverlay.classList.add('show');
+}
+
+// ===== DELETE CHOICE CONFIRM (3 buttons) =====
+function showDeleteChoiceConfirm(title, message, options) {
+    DOM.confirmTitle.textContent = title;
+    DOM.confirmMessage.textContent = message;
+
+    const actionsContainer = DOM.confirmOverlay.querySelector('.confirm-actions');
+    actionsContainer.innerHTML = `
+        <button class="confirm-btn no" id="confirmCancel">
+            Cancel
+        </button>
+        <button class="confirm-btn choice-single" id="confirmSingle">
+            <i class="fas ${options.planOnly.icon}"></i>
+            ${escapeHtml(options.planOnly.label)}
+        </button>
+        <button class="confirm-btn choice-both" id="confirmBoth">
+            <i class="fas ${options.both.icon}"></i>
+            ${escapeHtml(options.both.label)}
+        </button>
+    `;
+
+    actionsContainer.querySelector('#confirmCancel').addEventListener('click', closeConfirm);
+
+    actionsContainer.querySelector('#confirmSingle').addEventListener('click', () => {
+        options.planOnly.callback();
+        closeConfirm();
+    });
+
+    actionsContainer.querySelector('#confirmBoth').addEventListener('click', () => {
+        options.both.callback();
+        closeConfirm();
+    });
+
+    DOM.confirmOverlay.classList.add('show');
 }
 
 function closeConfirm() {
     DOM.confirmOverlay.classList.remove('show');
     confirmCallback = null;
 }
+
 
 // ===== TOAST =====
 function showToast(message, type) {
@@ -942,7 +1065,9 @@ function showToast(message, type) {
 
     toast.querySelector('.toast-close').addEventListener('click', () => removeToast(toast));
     DOM.toastContainer.appendChild(toast);
-    setTimeout(() => removeToast(toast), 3000);
+
+    // CHANGED: Reduced from 3000ms to 1500ms (1.5 seconds)
+    setTimeout(() => removeToast(toast), 900); 
 }
 
 function removeToast(toast) {
