@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CartMaster</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+	<link rel="icon" type="image/svg+xml" href="images/favi.png">
+	
+	
+		<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CGspeedway">
+
+<link rel="apple-touch-icon" href="./images/icon.svg">
+
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+
+<link rel="manifest" href="manifest.json">
+	
+	
+</head>
+<body>
+
+    <header class="app-header">
+        <div class="header-left">
+            <div class="logo">
+                <i class="fas fa-cart-shopping"></i>
+                <span>Cart<strong>Master</strong></span>
+            </div>
+        </div>
+        <div class="header-right">
+            <button class="icon-btn" id="clearAllBtn" title="Clear All">
+                <i class="fas fa-trash-can"></i>
+            </button>
+            <button class="icon-btn" id="sortBtn" title="Sort Options">
+                <i class="fas fa-arrow-down-a-z"></i>
+            </button>
+            <div class="total-badge" id="headerTotal">
+                <span>$0.00</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="sort-dropdown" id="sortDropdown">
+        <div class="sort-dropdown-header">
+            <i class="fas fa-sort"></i> Sort Options
+        </div>
+        <button class="sort-option" data-sort="alpha-asc">
+            <i class="fas fa-arrow-down-a-z"></i> Name A–Z
+        </button>
+        <button class="sort-option" data-sort="alpha-desc">
+            <i class="fas fa-arrow-up-z-a"></i> Name Z–A
+        </button>
+        <button class="sort-option" data-sort="price-asc">
+            <i class="fas fa-arrow-down-1-9"></i> Price Low–High
+        </button>
+        <button class="sort-option" data-sort="price-desc">
+            <i class="fas fa-arrow-up-9-1"></i> Price High–Low
+        </button>
+    </div>
+
+    <nav class="tab-nav">
+        <button class="tab-btn active" data-tab="planning">
+            <i class="fas fa-clipboard-list"></i>
+            <span>Plan List</span>
+            <span class="tab-count" id="planCount">0</span>
+        </button>
+        <button class="tab-btn" data-tab="shopping">
+            <i class="fas fa-basket-shopping"></i>
+            <span>Shopping Cart</span>
+            <span class="tab-count" id="cartCount">0</span>
+        </button>
+    </nav>
+
+    <!-- PLANNING TAB -->
+    <main class="tab-content active" id="planningTab">
+        <div class="search-section">
+            <div class="search-bar">
+                <i class="fas fa-magnifying-glass"></i>
+                <input type="text" id="planSearchInput" placeholder="Search or add new item..." autocomplete="off">
+                <button class="search-clear" id="planSearchClear">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+            <button class="add-btn" id="addPlanItemBtn">
+                <i class="fas fa-plus"></i>
+            </button>
+        </div>
+
+        <div class="quick-categories" id="catScroller">
+            <button class="cat-chip active" data-category="all">
+                <i class="fas fa-border-all"></i> All
+            </button>
+            <button class="cat-chip" data-category="produce">
+                <i class="fas fa-apple-whole"></i> Produce
+            </button>
+            <button class="cat-chip" data-category="dairy">
+                <i class="fas fa-cheese"></i> Dairy
+            </button>
+            <button class="cat-chip" data-category="meat">
+                <i class="fas fa-drumstick-bite"></i> Meat
+            </button>
+            <button class="cat-chip" data-category="bakery">
+                <i class="fas fa-bread-slice"></i> Bakery
+            </button>
+            <button class="cat-chip" data-category="beverages">
+                <i class="fas fa-mug-hot"></i> Drinks
+            </button>
+            <button class="cat-chip" data-category="frozen">
+                <i class="fas fa-snowflake"></i> Frozen
+            </button>
+            <button class="cat-chip" data-category="snacks">
+                <i class="fas fa-cookie-bite"></i> Snacks
+            </button>
+            <button class="cat-chip" data-category="other">
+                <i class="fas fa-ellipsis"></i> Other
+            </button>
+        </div>
+
+        <div class="list-container" id="planList"></div>
+    </main>
+
+    <!-- SHOPPING TAB -->
+    <main class="tab-content" id="shoppingTab">
+        <div class="search-section">
+            <div class="search-bar">
+                <i class="fas fa-magnifying-glass"></i>
+                <input type="text" id="cartSearchInput" placeholder="Search planned items to add..." autocomplete="off">
+                <button class="search-clear" id="cartSearchClear">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+            <button class="add-btn" id="addCartItemBtn" title="Add new item">
+                <i class="fas fa-plus"></i>
+            </button>
+        </div>
+
+        <div class="cart-scroll-area" id="cartScrollArea">
+            <div class="search-results-panel" id="searchResultsPanel">
+                <div class="search-results-header">
+                    <i class="fas fa-list-check"></i> Items from your plan
+                </div>
+                <div class="search-results-list" id="searchResultsList"></div>
+            </div>
+
+            <div class="cart-summary" id="cartSummary">
+                <div class="summary-row">
+                    <div class="summary-item">
+                        <span class="summary-label">Items</span>
+                        <span class="summary-value" id="totalItems">0</span>
+                    </div>
+                    <div class="summary-divider"></div>
+                    <div class="summary-item">
+                        <span class="summary-label">Planned</span>
+                        <span class="summary-value" id="checkedItems">0/0</span>
+                    </div>
+                    <div class="summary-divider"></div>
+                    <div class="summary-item primary">
+                        <span class="summary-label">Total</span>
+                        <span class="summary-value" id="runningTotal">$0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="list-container" id="cartList"></div>
+        </div>
+    </main>
+
+    <!-- MODAL -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal" id="modal">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add Item</h2>
+                <button class="modal-close" id="modalClose">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+            <div class="modal-footer" id="modalFooter">
+                <button class="btn btn-secondary" id="modalCancel">Cancel</button>
+                <button class="btn btn-primary" id="modalConfirm">
+                    <i class="fas fa-check"></i> Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONFIRM -->
+    <div class="modal-overlay" id="confirmOverlay">
+        <div class="modal confirm-modal">
+            <div class="confirm-icon" id="confirmIcon">
+                <i class="fas fa-triangle-exclamation"></i>
+            </div>
+            <h3 id="confirmTitle">Are you sure?</h3>
+            <p id="confirmMessage">This action cannot be undone.</p>
+            <div class="confirm-actions">
+                <button class="btn btn-secondary" id="confirmNo">Cancel</button>
+                <button class="btn btn-danger" id="confirmYes">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOASTS -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
