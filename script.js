@@ -92,16 +92,19 @@ const DOM = {
 // ===== STATE =====
 let currentTab = 'planning';
 let activeCategory = 'all';
-let currentSort = 'alpha-asc';
+let planSort = 'unchecked-first';
+let cartSort = 'alpha-asc';
 let confirmCallback = null;
 let modalMode = null;
 let editingItemId = null;
+let revealedItemId = null; // which item currently has actions shown
 
 // ===== INIT =====
 function init() {
     Store.load();
     bindEvents();
     initCategoryDrag();
+    buildSortDropdown();
     renderAll();
 }
 
@@ -110,6 +113,83 @@ function renderAll() {
     renderCartList();
     updateCounts();
     updateTotals();
+}
+
+// ===== REVEAL ITEM ACTIONS =====
+
+function revealItem(itemId, itemEl) {
+    // Close previously revealed item if different
+    if (revealedItemId && revealedItemId !== itemId) {
+        closeRevealedItem();
+    }
+
+    // Toggle: clicking the same item again closes it
+    if (revealedItemId === itemId) {
+        closeRevealedItem();
+        return;
+    }
+
+    revealedItemId = itemId;
+    itemEl.classList.add('actions-revealed');
+}
+
+function closeRevealedItem() {
+    if (!revealedItemId) return;
+    document.querySelectorAll('.list-item.actions-revealed').forEach(el => {
+        el.classList.remove('actions-revealed');
+    });
+    revealedItemId = null;
+}
+
+// ===== BUILD SORT DROPDOWN =====
+function buildSortDropdown() {
+    updateSortDropdown();
+}
+
+function updateSortDropdown() {
+    DOM.sortDropdown.innerHTML = '';
+
+    if (currentTab === 'planning') {
+        const options = [
+            { sort: 'unchecked-first', label: 'Unchecked First', icon: 'fa-square' },
+            { sort: 'checked-first', label: 'Checked First', icon: 'fa-square-check' }
+        ];
+        options.forEach(opt => {
+            const div = document.createElement('div');
+            div.className = 'sort-option' + (planSort === opt.sort ? ' active' : '');
+            div.dataset.sort = opt.sort;
+            div.innerHTML = `<i class="fas ${opt.icon}"></i> ${opt.label}`;
+            div.addEventListener('click', () => {
+                planSort = opt.sort;
+                DOM.sortDropdown.classList.remove('show');
+                updateSortDropdown();
+                renderPlanList();
+                showToast('Sorted successfully', 'info');
+            });
+            DOM.sortDropdown.appendChild(div);
+        });
+    } else {
+        const options = [
+            { sort: 'alpha-asc', label: 'Name A–Z', icon: 'fa-arrow-down-a-z' },
+            { sort: 'alpha-desc', label: 'Name Z–A', icon: 'fa-arrow-up-z-a' },
+            { sort: 'price-desc', label: 'Price High to Low', icon: 'fa-arrow-down-wide-short' },
+            { sort: 'price-asc', label: 'Price Low to High', icon: 'fa-arrow-up-short-wide' }
+        ];
+        options.forEach(opt => {
+            const div = document.createElement('div');
+            div.className = 'sort-option' + (cartSort === opt.sort ? ' active' : '');
+            div.dataset.sort = opt.sort;
+            div.innerHTML = `<i class="fas ${opt.icon}"></i> ${opt.label}`;
+            div.addEventListener('click', () => {
+                cartSort = opt.sort;
+                DOM.sortDropdown.classList.remove('show');
+                updateSortDropdown();
+                renderCartList();
+                showToast('Sorted successfully', 'info');
+            });
+            DOM.sortDropdown.appendChild(div);
+        });
+    }
 }
 
 // ===== CATEGORY DRAG SCROLL =====
@@ -195,21 +275,18 @@ function bindEvents() {
     // Sort
     DOM.sortBtn.addEventListener('click', (e) => {
         e.stopPropagation();
+        updateSortDropdown();
         DOM.sortDropdown.classList.toggle('show');
     });
 
-    DOM.sortOptions.forEach(opt => {
-        opt.addEventListener('click', () => {
-            currentSort = opt.dataset.sort;
-            DOM.sortDropdown.classList.remove('show');
-            renderPlanList();
-            renderCartList();
-            showToast('Sorted successfully', 'info');
-        });
-    });
-
-    document.addEventListener('click', () => {
+    // Global click — close sort dropdown and close any revealed item
+    document.addEventListener('click', (e) => {
         DOM.sortDropdown.classList.remove('show');
+
+        // Only close revealed item if the click is NOT on a list-item or its children
+        if (!e.target.closest('.list-item')) {
+            closeRevealedItem();
+        }
     });
 
     // Clear all
@@ -218,17 +295,7 @@ function bindEvents() {
             showToast('Nothing to clear', 'info');
             return;
         }
-        showConfirm(
-            'Clear Everything?',
-            'This will remove all items from both your plan and cart lists.',
-            () => {
-                Store.planItems = [];
-                Store.cartItems = [];
-                Store.save();
-                renderAll();
-                showToast('All items cleared', 'success');
-            }
-        );
+        showClearChoiceConfirm();
     });
 
     // Modal
@@ -261,12 +328,14 @@ function bindEvents() {
 
 // ===== TAB SWITCHING =====
 function switchTab(tab) {
+    closeRevealedItem();
     currentTab = tab;
     DOM.tabBtns.forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tab);
     });
     DOM.planningTab.classList.toggle('active', tab === 'planning');
     DOM.shoppingTab.classList.toggle('active', tab === 'shopping');
+    updateSortDropdown();
 }
 
 // ===== HELPERS =====
@@ -288,17 +357,47 @@ function getCategoryInfo(id) {
     return CATEGORIES.find(c => c.id === id) || CATEGORIES[CATEGORIES.length - 1];
 }
 
-function sortItems(items) {
+function sortPlanItems(items) {
     const s = [...items];
-    switch (currentSort) {
+    switch (planSort) {
+        case 'unchecked-first':
+            return s.sort((a, b) => {
+                const aInCart = isItemInCart(a.id) ? 1 : 0;
+                const bInCart = isItemInCart(b.id) ? 1 : 0;
+                if (aInCart !== bInCart) return aInCart - bInCart;
+                return a.name.localeCompare(b.name);
+            });
+        case 'checked-first':
+            return s.sort((a, b) => {
+                const aInCart = isItemInCart(a.id) ? 0 : 1;
+                const bInCart = isItemInCart(b.id) ? 0 : 1;
+                if (aInCart !== bInCart) return aInCart - bInCart;
+                return a.name.localeCompare(b.name);
+            });
+        default:
+            return s;
+    }
+}
+
+function sortCartItems(items) {
+    const s = [...items];
+    switch (cartSort) {
         case 'alpha-asc':
             return s.sort((a, b) => a.name.localeCompare(b.name));
         case 'alpha-desc':
             return s.sort((a, b) => b.name.localeCompare(a.name));
         case 'price-asc':
-            return s.sort((a, b) => (a.price || 0) - (b.price || 0));
+            return s.sort((a, b) => {
+                const totalA = (a.price || 0) * (a.quantity || 1);
+                const totalB = (b.price || 0) * (b.quantity || 1);
+                return totalA - totalB;
+            });
         case 'price-desc':
-            return s.sort((a, b) => (b.price || 0) - (a.price || 0));
+            return s.sort((a, b) => {
+                const totalA = (a.price || 0) * (a.quantity || 1);
+                const totalB = (b.price || 0) * (b.quantity || 1);
+                return totalB - totalA;
+            });
         default:
             return s;
     }
@@ -323,7 +422,7 @@ function renderPlanList() {
         items = items.filter(item => item.name.toLowerCase().includes(searchTerm));
     }
 
-    items = sortItems(items);
+    items = sortPlanItems(items);
 
     DOM.planList.innerHTML = '';
 
@@ -374,12 +473,12 @@ function createPlanItem(item, idx) {
                 ${inCart ? '<span class="item-in-cart-badge"><i class="fas fa-cart-shopping"></i> In cart</span>' : ''}
             </div>
         </div>
+        ${!inCart ? `
+            <button class="item-action-btn send" title="Send to Cart" data-action="send">
+                <i class="fas fa-cart-plus"></i>
+            </button>
+        ` : ''}
         <div class="item-actions">
-            ${!inCart ? `
-                <button class="item-action-btn send" title="Send to Cart" data-action="send">
-                    <i class="fas fa-cart-plus"></i>
-                </button>
-            ` : ''}
             <button class="item-action-btn edit" title="Edit" data-action="edit-plan">
                 <i class="fas fa-pen"></i>
             </button>
@@ -389,16 +488,34 @@ function createPlanItem(item, idx) {
         </div>
     `;
 
+    // ── Click row to reveal edit/delete ──
+    div.addEventListener('click', (e) => {
+        if (e.target.closest('[data-action]')) return;
+        e.stopPropagation();
+        revealItem(item.id, div);
+    });
+
+    // ── Send button (always visible, outside item-actions) ──
     const sendBtn = div.querySelector('[data-action="send"]');
     if (sendBtn) {
-        sendBtn.addEventListener('click', () => openModal('send-to-cart', null, item.id));
+        sendBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            closeRevealedItem();
+            openModal('send-to-cart', null, item.id);
+        });
     }
 
-    div.querySelector('[data-action="edit-plan"]').addEventListener('click', () => {
+    // ── Edit/Delete (inside item-actions, revealed on click) ──
+    div.querySelector('[data-action="edit-plan"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeRevealedItem();
         openModal('edit-plan', null, item.id);
     });
 
-    div.querySelector('[data-action="delete-plan"]').addEventListener('click', () => {
+    div.querySelector('[data-action="delete-plan"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeRevealedItem();
+
         const linked = Store.cartItems.find(c => c.planId === item.id);
 
         if (linked) {
@@ -411,7 +528,6 @@ function createPlanItem(item, idx) {
                         icon: 'fa-clipboard-list',
                         callback: () => {
                             Store.planItems = Store.planItems.filter(i => i.id !== item.id);
-                            // Unlink the cart item so it becomes standalone
                             const cartItem = Store.cartItems.find(c => c.planId === item.id);
                             if (cartItem) cartItem.planId = null;
                             Store.save();
@@ -448,6 +564,14 @@ function createPlanItem(item, idx) {
 
     return div;
 }
+
+
+
+
+
+
+
+
 
 function deletePlanItem(id) {
     const item = Store.planItems.find(i => i.id === id);
@@ -516,7 +640,7 @@ function renderSearchResults(results) {
 
 function renderCartList() {
     let items = [...Store.cartItems];
-    items = sortItems(items);
+    items = sortCartItems(items);
 
     DOM.cartList.innerHTML = '';
 
@@ -564,11 +688,24 @@ function createCartItem(item, idx) {
         </div>
     `;
 
-    div.querySelector('[data-action="edit-cart"]').addEventListener('click', () => {
+    // ── Click anywhere on the row (not a button) to reveal actions ──
+    div.addEventListener('click', (e) => {
+        if (e.target.closest('[data-action]')) return;
+        e.stopPropagation();
+        revealItem(item.id, div);
+    });
+
+    // ── Action buttons ──
+    div.querySelector('[data-action="edit-cart"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeRevealedItem();
         openModal('edit-cart', null, item.id);
     });
 
-    div.querySelector('[data-action="delete-cart"]').addEventListener('click', () => {
+    div.querySelector('[data-action="delete-cart"]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeRevealedItem();
+
         const linkedPlan = item.planId
             ? Store.planItems.find(p => p.id === item.planId)
             : null;
@@ -648,6 +785,7 @@ function updateTotals() {
 
 // ===== MODAL =====
 function openModal(mode, prefillName, itemId) {
+    closeRevealedItem();
     prefillName = prefillName || null;
     itemId = itemId || null;
     modalMode = mode;
@@ -853,6 +991,7 @@ function handleModalConfirm() {
         case 'edit-plan': {
             const item = Store.planItems.find(i => i.id === editingItemId);
             if (item) {
+                const oldQuantity = item.quantity;
                 item.name = capitalizeFirst(name);
                 item.category = category;
                 item.quantity = quantity;
@@ -861,6 +1000,9 @@ function handleModalConfirm() {
                 if (linked) {
                     linked.name = item.name;
                     linked.category = item.category;
+                    if (oldQuantity !== quantity) {
+                        linked.quantity = quantity;
+                    }
                 }
                 Store.save();
                 renderAll();
@@ -884,6 +1026,8 @@ function handleModalConfirm() {
                 if (priceEl) priceEl.focus();
                 return;
             }
+
+            planItem.quantity = quantity;
 
             Store.cartItems.push({
                 id: Store.generateId(),
@@ -920,6 +1064,8 @@ function handleModalConfirm() {
                     createdAt: Date.now()
                 };
                 Store.planItems.push(planItem);
+            } else {
+                planItem.quantity = quantity;
             }
 
             if (isItemInCart(planItem.id)) {
@@ -954,6 +1100,7 @@ function handleModalConfirm() {
                     if (priceEl) priceEl.focus();
                     return;
                 }
+                const oldQuantity = item.quantity;
                 item.name = capitalizeFirst(name);
                 item.price = price;
                 item.quantity = quantity;
@@ -964,6 +1111,9 @@ function handleModalConfirm() {
                     if (linked) {
                         linked.name = item.name;
                         linked.category = item.category;
+                        if (oldQuantity !== quantity) {
+                            linked.quantity = quantity;
+                        }
                     }
                 }
                 Store.save();
@@ -983,14 +1133,12 @@ function showConfirm(title, message, callback) {
     DOM.confirmMessage.textContent = message;
     confirmCallback = callback;
 
-    // Reset to standard two-button layout
     const actionsContainer = DOM.confirmOverlay.querySelector('.confirm-actions');
     actionsContainer.innerHTML = `
         <button class="confirm-btn no" id="confirmNo">Cancel</button>
         <button class="confirm-btn yes" id="confirmYes">Delete</button>
     `;
 
-    // Re-bind the new buttons
     actionsContainer.querySelector('#confirmNo').addEventListener('click', closeConfirm);
     actionsContainer.querySelector('#confirmYes').addEventListener('click', () => {
         if (confirmCallback) confirmCallback();
@@ -1000,16 +1148,14 @@ function showConfirm(title, message, callback) {
     DOM.confirmOverlay.classList.add('show');
 }
 
-// ===== DELETE CHOICE CONFIRM (3 buttons) =====
+// ===== DELETE CHOICE CONFIRM =====
 function showDeleteChoiceConfirm(title, message, options) {
     DOM.confirmTitle.textContent = title;
     DOM.confirmMessage.textContent = message;
 
     const actionsContainer = DOM.confirmOverlay.querySelector('.confirm-actions');
     actionsContainer.innerHTML = `
-        <button class="confirm-btn no" id="confirmCancel">
-            Cancel
-        </button>
+        <button class="confirm-btn no" id="confirmCancel">Cancel</button>
         <button class="confirm-btn choice-single" id="confirmSingle">
             <i class="fas ${options.planOnly.icon}"></i>
             ${escapeHtml(options.planOnly.label)}
@@ -1021,12 +1167,10 @@ function showDeleteChoiceConfirm(title, message, options) {
     `;
 
     actionsContainer.querySelector('#confirmCancel').addEventListener('click', closeConfirm);
-
     actionsContainer.querySelector('#confirmSingle').addEventListener('click', () => {
         options.planOnly.callback();
         closeConfirm();
     });
-
     actionsContainer.querySelector('#confirmBoth').addEventListener('click', () => {
         options.both.callback();
         closeConfirm();
@@ -1035,11 +1179,100 @@ function showDeleteChoiceConfirm(title, message, options) {
     DOM.confirmOverlay.classList.add('show');
 }
 
+// ===== CLEAR CHOICE CONFIRM =====
+function showClearChoiceConfirm() {
+    DOM.confirmTitle.textContent = 'Clear Items';
+    DOM.confirmMessage.textContent = 'What would you like to clear?';
+
+    const actionsContainer = DOM.confirmOverlay.querySelector('.confirm-actions');
+
+    const hasPlan = Store.planItems.length > 0;
+    const hasCart = Store.cartItems.length > 0;
+
+    actionsContainer.innerHTML = `
+        <button class="confirm-btn no" id="confirmCancel">Cancel</button>
+        ${hasPlan ? `
+        <button class="confirm-btn choice-single" id="confirmClearPlan">
+            <i class="fas fa-clipboard-list"></i>
+            Clear Plan List
+        </button>
+        ` : ''}
+        ${hasCart ? `
+        <button class="confirm-btn choice-single" id="confirmClearCart">
+            <i class="fas fa-cart-shopping"></i>
+            Clear Shopping Cart
+        </button>
+        ` : ''}
+        ${hasPlan && hasCart ? `
+        <button class="confirm-btn choice-both" id="confirmClearBoth">
+            <i class="fas fa-trash-can"></i>
+            Clear Both
+        </button>
+        ` : ''}
+    `;
+
+    actionsContainer.querySelector('#confirmCancel').addEventListener('click', closeConfirm);
+
+    const clearPlanBtn = actionsContainer.querySelector('#confirmClearPlan');
+    if (clearPlanBtn) {
+        clearPlanBtn.addEventListener('click', () => {
+            closeConfirm();
+            showConfirm(
+                'Clear Plan List?',
+                'Are you sure you want to remove all items from your plan list? Cart items will be unlinked but kept.',
+                () => {
+                    Store.cartItems.forEach(c => { if (c.planId) c.planId = null; });
+                    Store.planItems = [];
+                    Store.save();
+                    renderAll();
+                    showToast('Plan list cleared', 'success');
+                }
+            );
+        });
+    }
+
+    const clearCartBtn = actionsContainer.querySelector('#confirmClearCart');
+    if (clearCartBtn) {
+        clearCartBtn.addEventListener('click', () => {
+            closeConfirm();
+            showConfirm(
+                'Clear Shopping Cart?',
+                'Are you sure you want to remove all items from your shopping cart? Plan items will be kept.',
+                () => {
+                    Store.cartItems = [];
+                    Store.save();
+                    renderAll();
+                    showToast('Shopping cart cleared', 'success');
+                }
+            );
+        });
+    }
+
+    const clearBothBtn = actionsContainer.querySelector('#confirmClearBoth');
+    if (clearBothBtn) {
+        clearBothBtn.addEventListener('click', () => {
+            closeConfirm();
+            showConfirm(
+                'Clear Everything?',
+                'Are you sure you want to remove ALL items from both your plan and cart? This cannot be undone.',
+                () => {
+                    Store.planItems = [];
+                    Store.cartItems = [];
+                    Store.save();
+                    renderAll();
+                    showToast('All items cleared', 'success');
+                }
+            );
+        });
+    }
+
+    DOM.confirmOverlay.classList.add('show');
+}
+
 function closeConfirm() {
     DOM.confirmOverlay.classList.remove('show');
     confirmCallback = null;
 }
-
 
 // ===== TOAST =====
 function showToast(message, type) {
@@ -1066,8 +1299,7 @@ function showToast(message, type) {
     toast.querySelector('.toast-close').addEventListener('click', () => removeToast(toast));
     DOM.toastContainer.appendChild(toast);
 
-    // CHANGED: Reduced from 3000ms to 1500ms (1.5 seconds)
-    setTimeout(() => removeToast(toast), 900); 
+    setTimeout(() => removeToast(toast), 900);
 }
 
 function removeToast(toast) {

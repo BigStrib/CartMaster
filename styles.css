@@ -592,6 +592,7 @@ input[type="number"] {
     border-radius: var(--radius-md);
     padding: 14px;
     margin-bottom: 8px;
+    cursor: pointer;
     transition: all var(--transition-normal);
     animation: slideIn 0.3s ease forwards;
     position: relative;
@@ -610,15 +611,6 @@ input[type="number"] {
     transition: opacity var(--transition-fast);
 }
 
-.list-item:hover {
-    background: var(--bg-card-hover);
-    border-color: var(--border-light);
-}
-
-.list-item:hover::before {
-    opacity: 1;
-}
-
 .list-item.checked .item-name {
     text-decoration: line-through;
     color: var(--text-tertiary);
@@ -630,6 +622,16 @@ input[type="number"] {
 
 .list-item.removing {
     animation: slideOut 0.3s ease forwards;
+}
+
+/* Revealed state */
+.list-item.actions-revealed {
+    background: var(--bg-card-hover);
+    border-color: var(--border-light);
+}
+
+.list-item.actions-revealed::before {
+    opacity: 1;
 }
 
 @keyframes slideIn {
@@ -654,7 +656,7 @@ input[type="number"] {
     }
 }
 
-/* Checkbox */
+/* ===== CHECKBOX ===== */
 .item-check {
     width: 26px;
     height: 26px;
@@ -687,7 +689,7 @@ input[type="number"] {
     pointer-events: none;
 }
 
-/* Item Info */
+/* ===== ITEM INFO ===== */
 .item-info {
     flex: 1;
     min-width: 0;
@@ -734,7 +736,7 @@ input[type="number"] {
     gap: 4px;
 }
 
-/* Item Price */
+/* ===== ITEM PRICE ===== */
 .item-price {
     font-size: 1rem;
     font-weight: 700;
@@ -743,12 +745,7 @@ input[type="number"] {
     margin-right: 4px;
 }
 
-/* Item Actions */
-.item-actions {
-    display: flex;
-    gap: 4px;
-}
-
+/* ===== ITEM ACTION BUTTONS ===== */
 .item-action-btn {
     width: 32px;
     height: 32px;
@@ -762,6 +759,7 @@ input[type="number"] {
     cursor: pointer;
     font-size: 0.75rem;
     transition: all var(--transition-fast);
+    flex-shrink: 0;
 }
 
 .item-action-btn:hover {
@@ -779,9 +777,40 @@ input[type="number"] {
     background: rgba(231, 76, 60, 0.1);
 }
 
-.item-action-btn.send:hover {
+.item-action-btn.send {
     color: var(--success);
     background: rgba(39, 174, 96, 0.1);
+    flex-shrink: 0;
+}
+
+.item-action-btn.send:hover {
+    color: var(--success);
+    background: rgba(39, 174, 96, 0.2);
+}
+
+/* ===== ITEM ACTIONS — edit & delete hidden until click/tap ===== */
+.item-actions {
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(6px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.list-item.actions-revealed .item-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+/* Send button sits outside item-actions, always visible */
+.list-item > .item-action-btn.send {
+    margin-left: auto;
+}
+
+.list-item > .item-action-btn.send + .item-actions {
+    margin-left: 4px;
 }
 
 /* ===== SEARCH RESULTS PANEL ===== */
@@ -2034,45 +2063,6 @@ input[type="number"] {
 
     .tab-btn {
         font-size: 1rem;
-    }
-}
-
-/* ===== HOVER CAPABLE DEVICES ONLY ===== */
-@media (hover: hover) and (pointer: fine) {
-    .list-item {
-        cursor: default;
-    }
-
-    .item-action-btn {
-        opacity: 0.6;
-    }
-
-    .list-item:hover .item-action-btn {
-        opacity: 1;
-    }
-
-    .cat-chip {
-        cursor: pointer;
-    }
-
-    .search-result-item {
-        cursor: pointer;
-    }
-}
-
-/* ===== TOUCH DEVICES ===== */
-@media (hover: none) and (pointer: coarse) {
-    .item-action-btn {
-        opacity: 1;
-    }
-
-    .list-item::before {
-        opacity: 0 !important;
-    }
-
-    .list-item:hover {
-        background: var(--bg-card);
-        border-color: var(--border-color);
     }
 }
 
