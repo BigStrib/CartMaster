@@ -7,73 +7,56 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-	<link rel="icon" type="image/svg+xml" href="images/favi.png">
-	
-	
-		<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="CGspeedway">
+    <link rel="icon" type="image/svg+xml" href="images/favi.png">
 
-<link rel="apple-touch-icon" href="./images/icon.svg">
-
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#000000">
-
-<link rel="manifest" href="manifest.json">
-	
-	
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CartMaster">
+    <link rel="apple-touch-icon" href="./images/icon.svg">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#000000">
+    <link rel="manifest" href="manifest.json">
 </head>
 <body>
 
     <header class="app-header">
-        <div class="header-left">
+        <div class="app-header-inner">
             <div class="logo">
                 <i class="fas fa-cart-shopping"></i>
                 <span>Cart<strong>Master</strong></span>
             </div>
-        </div>
-        <div class="header-right">
-            <button class="icon-btn" id="clearAllBtn" title="Clear All">
-                <i class="fas fa-trash-can"></i>
-            </button>
-            <button class="icon-btn" id="sortBtn" title="Sort Options">
-                <i class="fas fa-arrow-down-a-z"></i>
-            </button>
-            <div class="total-badge" id="headerTotal">
-                <span>$0.00</span>
+            <div class="header-right">
+                <button class="icon-btn" id="settingsBtn" title="Settings">
+                    <i class="fas fa-gear"></i>
+                </button>
+                <button class="icon-btn" id="sortBtn" title="Sort Options">
+                    <i class="fas fa-arrow-down-a-z"></i>
+                </button>
+                <button class="icon-btn" id="clearAllBtn" title="Clear All">
+                    <i class="fas fa-trash-can"></i>
+                </button>
+                <div class="total-badge" id="headerTotal">
+                    <span>$0.00</span>
+                </div>
             </div>
         </div>
     </header>
 
-    <div class="sort-dropdown" id="sortDropdown">
-        <div class="sort-dropdown-header">
-            <i class="fas fa-sort"></i> Sort Options
-        </div>
-        <button class="sort-option" data-sort="alpha-asc">
-            <i class="fas fa-arrow-down-a-z"></i> Name A–Z
-        </button>
-        <button class="sort-option" data-sort="alpha-desc">
-            <i class="fas fa-arrow-up-z-a"></i> Name Z–A
-        </button>
-        <button class="sort-option" data-sort="price-asc">
-            <i class="fas fa-arrow-down-1-9"></i> Price Low–High
-        </button>
-        <button class="sort-option" data-sort="price-desc">
-            <i class="fas fa-arrow-up-9-1"></i> Price High–Low
-        </button>
-    </div>
+    <div class="sort-dropdown" id="sortDropdown"></div>
 
     <nav class="tab-nav">
-        <button class="tab-btn active" data-tab="planning">
-            <i class="fas fa-clipboard-list"></i>
-            <span>Plan List</span>
-            <span class="tab-count" id="planCount">0</span>
-        </button>
-        <button class="tab-btn" data-tab="shopping">
-            <i class="fas fa-basket-shopping"></i>
-            <span>Shopping Cart</span>
-            <span class="tab-count" id="cartCount">0</span>
-        </button>
+        <div class="tab-nav-inner">
+            <button class="tab-btn active" data-tab="planning">
+                <i class="fas fa-clipboard-list"></i>
+                <span>Plan List</span>
+                <span class="tab-count" id="planCount">0</span>
+            </button>
+            <button class="tab-btn" data-tab="shopping">
+                <i class="fas fa-basket-shopping"></i>
+                <span>Shopping Cart</span>
+                <span class="tab-count" id="cartCount">0</span>
+            </button>
+        </div>
     </nav>
 
     <!-- PLANNING TAB -->
@@ -164,6 +147,7 @@
                         <span class="summary-value" id="runningTotal">$0.00</span>
                     </div>
                 </div>
+                <div class="totals-breakdown" id="totalsBreakdown"></div>
             </div>
 
             <div class="list-container" id="cartList"></div>
