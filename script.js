@@ -1,1210 +1,729 @@
-// ===== DATA STORE =====
-const Store = {
-    planItems: [],
-    cartItems: [],
-    settings: {
-        salesTaxRate: 0,
-        depositAmount: 0
-    },
+(function () {
+    'use strict';
 
-    save() {
-        localStorage.setItem('cartmaster_plan', JSON.stringify(this.planItems));
-        localStorage.setItem('cartmaster_cart', JSON.stringify(this.cartItems));
-        localStorage.setItem('cartmaster_settings', JSON.stringify(this.settings));
-    },
+    var STORAGE_KEY = 'dashboard_pages';
+    var TABS_PER_PAGE = 3;
 
-    load() {
+    var state = {
+        pages: [],
+        activePageId: null,
+        sidebarOpen: false,
+        editMode: false,
+        editingPageId: null,
+        tabPage: 0
+    };
+
+    var els = {
+        sidebarTrigger: document.getElementById('sidebarTrigger'),
+        overlay: document.getElementById('overlay'),
+        sidebar: document.getElementById('sidebar'),
+        closeSidebar: document.getElementById('closeSidebar'),
+        urlName: document.getElementById('urlName'),
+        urlInput: document.getElementById('urlInput'),
+        addUrlBtn: document.getElementById('addUrlBtn'),
+        pagesList: document.getElementById('pagesList'),
+        editModeBtn: document.getElementById('editModeBtn'),
+        canvas: document.getElementById('canvas'),
+        emptyState: document.getElementById('emptyState'),
+        iframeContainer: document.getElementById('iframeContainer'),
+        tabsBar: document.getElementById('tabsBar'),
+        tabsWindow: document.getElementById('tabsWindow'),
+        tabArrowLeft: document.getElementById('tabArrowLeft'),
+        tabArrowRight: document.getElementById('tabArrowRight'),
+        editOverlay: document.getElementById('editOverlay'),
+        editGrid: document.getElementById('editGrid'),
+        doneEditBtn: document.getElementById('doneEditBtn'),
+        editPageModal: document.getElementById('editPageModal'),
+        editPageName: document.getElementById('editPageName'),
+        editPageUrl: document.getElementById('editPageUrl'),
+        closeEditModal: document.getElementById('closeEditModal'),
+        cancelEditPage: document.getElementById('cancelEditPage'),
+        saveEditPage: document.getElementById('saveEditPage'),
+        toast: document.getElementById('toast')
+    };
+
+    function getTabsPerPage() {
+        var w = window.innerWidth;
+        if (w >= 1200) return 8;
+        if (w >= 768) return 5;
+        return 3;
+    }
+
+    // ---- Utilities ----
+
+    function generateId() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+    }
+
+    function normalizeUrl(url) {
+        url = url.trim();
+        if (!url) return '';
+        if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+        return url;
+    }
+
+    function getDomain(url) {
+        try { return new URL(url).hostname; }
+        catch (e) { return url; }
+    }
+
+    function getInitial(name) {
+        return (name || '?').charAt(0).toUpperCase();
+    }
+
+    function escapeHtml(str) {
+        var d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    // ---- Storage ----
+
+    function saveState() {
         try {
-            const plan = localStorage.getItem('cartmaster_plan');
-            const cart = localStorage.getItem('cartmaster_cart');
-            const settings = localStorage.getItem('cartmaster_settings');
-            this.planItems = plan ? JSON.parse(plan) : [];
-            this.cartItems = cart ? JSON.parse(cart) : [];
-            this.settings = settings ? JSON.parse(settings) : { salesTaxRate: 0, depositAmount: 0 };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                pages: state.pages,
+                activePageId: state.activePageId
+            }));
+        } catch (e) {}
+    }
+
+    function loadState() {
+        try {
+            var raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                var data = JSON.parse(raw);
+                state.pages = data.pages || [];
+                state.activePageId = data.activePageId || null;
+                if (state.activePageId && !state.pages.find(function (p) { return p.id === state.activePageId; })) {
+                    state.activePageId = state.pages.length > 0 ? state.pages[0].id : null;
+                }
+            }
         } catch (e) {
-            this.planItems = [];
-            this.cartItems = [];
-            this.settings = { salesTaxRate: 0, depositAmount: 0 };
+            state.pages = [];
+            state.activePageId = null;
         }
-    },
-
-    generateId() {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
     }
-};
 
-// ===== CATEGORIES =====
-const CATEGORIES = [
-    { id: 'produce', label: 'Produce', icon: 'fa-apple-whole' },
-    { id: 'dairy', label: 'Dairy', icon: 'fa-cheese' },
-    { id: 'meat', label: 'Meat', icon: 'fa-drumstick-bite' },
-    { id: 'bakery', label: 'Bakery', icon: 'fa-bread-slice' },
-    { id: 'beverages', label: 'Beverages', icon: 'fa-mug-hot' },
-    { id: 'frozen', label: 'Frozen', icon: 'fa-snowflake' },
-    { id: 'snacks', label: 'Snacks', icon: 'fa-cookie-bite' },
-    { id: 'other', label: 'Other', icon: 'fa-ellipsis' }
-];
+    // ---- Toast ----
 
-// ===== DOM =====
-const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => document.querySelectorAll(sel);
+    var toastTimer = null;
+    function showToast(message, type) {
+        type = type || 'success';
+        clearTimeout(toastTimer);
+        els.toast.textContent = message;
+        els.toast.className = 'toast ' + type;
+        void els.toast.offsetWidth;
+        els.toast.classList.add('show');
+        toastTimer = setTimeout(function () { els.toast.classList.remove('show'); }, 2500);
+    }
 
-const DOM = {
-    tabBtns: $$('.tab-btn'),
-    planningTab: $('#planningTab'),
-    shoppingTab: $('#shoppingTab'),
+    // ---- Confirm ----
 
-    planSearchInput: $('#planSearchInput'),
-    planSearchClear: $('#planSearchClear'),
-    addPlanItemBtn: $('#addPlanItemBtn'),
-    planList: $('#planList'),
-    planCount: $('#planCount'),
-    catChips: $$('.cat-chip'),
-    catScroller: $('#catScroller'),
-
-    cartSearchInput: $('#cartSearchInput'),
-    cartSearchClear: $('#cartSearchClear'),
-    addCartItemBtn: $('#addCartItemBtn'),
-    cartList: $('#cartList'),
-    cartCount: $('#cartCount'),
-    searchResultsPanel: $('#searchResultsPanel'),
-    searchResultsList: $('#searchResultsList'),
-
-    totalItems: $('#totalItems'),
-    checkedItems: $('#checkedItems'),
-    runningTotal: $('#runningTotal'),
-    headerTotal: $('#headerTotal'),
-    totalsBreakdown: $('#totalsBreakdown'),
-
-    sortBtn: $('#sortBtn'),
-    sortDropdown: $('#sortDropdown'),
-    clearAllBtn: $('#clearAllBtn'),
-    settingsBtn: $('#settingsBtn'),
-
-    modalOverlay: $('#modalOverlay'),
-    modalTitle: $('#modalTitle'),
-    modalBody: $('#modalBody'),
-    modalClose: $('#modalClose'),
-    modalCancel: $('#modalCancel'),
-    modalConfirm: $('#modalConfirm'),
-
-    confirmOverlay: $('#confirmOverlay'),
-    confirmTitle: $('#confirmTitle'),
-    confirmMessage: $('#confirmMessage'),
-    confirmYes: $('#confirmYes'),
-    confirmNo: $('#confirmNo'),
-
-    toastContainer: $('#toastContainer')
-};
-
-// ===== STATE =====
-let currentTab = 'planning';
-let activeCategory = 'all';
-let planSort = 'unchecked-first';
-let cartSort = 'alpha-asc';
-let confirmCallback = null;
-let modalMode = null;
-let editingItemId = null;
-let revealedItemId = null;
-let skipPlanSearch = false;
-
-// ===== INIT =====
-function init() {
-    Store.load();
-    bindEvents();
-    initCategoryDrag();
-    buildSortDropdown();
-    renderAll();
-}
-
-function renderAll() {
-    renderPlanList();
-    renderCartList();
-    updateCounts();
-    updateTotals();
-}
-
-// ===== RESET SEARCH =====
-function resetPlanSearch() {
-    DOM.planSearchInput.value = '';
-    DOM.planSearchClear.classList.remove('show');
-    DOM.planSearchInput.blur();
-    activeCategory = 'all';
-    DOM.catChips.forEach(c => {
-        c.classList.toggle('active', c.dataset.category === 'all');
-    });
-    skipPlanSearch = true;
-}
-
-function resetCartSearch() {
-    DOM.cartSearchInput.value = '';
-    DOM.cartSearchClear.classList.remove('show');
-    DOM.cartSearchInput.blur();
-    DOM.searchResultsPanel.classList.remove('show');
-}
-
-// ===== REVEAL ITEM ACTIONS =====
-function revealItem(itemId, itemEl) {
-    if (revealedItemId && revealedItemId !== itemId) closeRevealedItem();
-    if (revealedItemId === itemId) { closeRevealedItem(); return; }
-    revealedItemId = itemId;
-    itemEl.classList.add('actions-revealed');
-}
-
-function closeRevealedItem() {
-    if (!revealedItemId) return;
-    document.querySelectorAll('.list-item.actions-revealed').forEach(el => {
-        el.classList.remove('actions-revealed');
-    });
-    revealedItemId = null;
-}
-
-// ===== SORT DROPDOWN =====
-function buildSortDropdown() { updateSortDropdown(); }
-
-function updateSortDropdown() {
-    DOM.sortDropdown.innerHTML = '';
-
-    if (currentTab === 'planning') {
-        const options = [
-            { sort: 'unchecked-first', label: 'Unchecked First', icon: 'fa-square' },
-            { sort: 'checked-first', label: 'Checked First', icon: 'fa-square-check' }
-        ];
-        options.forEach(opt => {
-            const div = document.createElement('div');
-            div.className = 'sort-option' + (planSort === opt.sort ? ' active' : '');
-            div.innerHTML = `<i class="fas ${opt.icon}"></i> ${opt.label}`;
-            div.addEventListener('click', () => {
-                planSort = opt.sort;
-                DOM.sortDropdown.classList.remove('show');
-                updateSortDropdown();
-                renderPlanList();
-                showToast('Sorted successfully', 'info');
-            });
-            DOM.sortDropdown.appendChild(div);
-        });
-    } else {
-        const options = [
-            { sort: 'alpha-asc', label: 'Name A–Z', icon: 'fa-arrow-down-a-z' },
-            { sort: 'alpha-desc', label: 'Name Z–A', icon: 'fa-arrow-up-z-a' },
-            { sort: 'price-desc', label: 'Price High to Low', icon: 'fa-arrow-down-wide-short' },
-            { sort: 'price-asc', label: 'Price Low to High', icon: 'fa-arrow-up-short-wide' }
-        ];
-        options.forEach(opt => {
-            const div = document.createElement('div');
-            div.className = 'sort-option' + (cartSort === opt.sort ? ' active' : '');
-            div.innerHTML = `<i class="fas ${opt.icon}"></i> ${opt.label}`;
-            div.addEventListener('click', () => {
-                cartSort = opt.sort;
-                DOM.sortDropdown.classList.remove('show');
-                updateSortDropdown();
-                renderCartList();
-                showToast('Sorted successfully', 'info');
-            });
-            DOM.sortDropdown.appendChild(div);
+    function showConfirm(title, message) {
+        return new Promise(function (resolve) {
+            var ov = document.createElement('div');
+            ov.className = 'confirm-overlay';
+            ov.innerHTML =
+                '<div class="confirm-dialog"><h3>' + title + '</h3><p>' + message + '</p>' +
+                '<div class="confirm-actions"><button class="confirm-cancel">Cancel</button>' +
+                '<button class="confirm-delete">Remove</button></div></div>';
+            document.body.appendChild(ov);
+            function close(r) { ov.remove(); resolve(r); }
+            ov.querySelector('.confirm-cancel').addEventListener('click', function () { close(false); });
+            ov.querySelector('.confirm-delete').addEventListener('click', function () { close(true); });
+            ov.addEventListener('click', function (e) { if (e.target === ov) close(false); });
         });
     }
-}
 
-// ===== CATEGORY DRAG =====
-function initCategoryDrag() {
-    const el = DOM.catScroller;
-    let isDown = false, startX, scrollLeft, moved = false;
+    // ---- Sidebar ----
 
-    el.addEventListener('mousedown', (e) => {
-        isDown = true; moved = false;
-        el.classList.add('dragging');
-        startX = e.pageX - el.offsetLeft;
-        scrollLeft = el.scrollLeft;
-    });
-    el.addEventListener('mouseleave', () => { isDown = false; el.classList.remove('dragging'); });
-    el.addEventListener('mouseup', () => { isDown = false; el.classList.remove('dragging'); });
-    el.addEventListener('mousemove', (e) => {
-        if (!isDown) return;
-        e.preventDefault();
-        const x = e.pageX - el.offsetLeft;
-        const walk = (x - startX) * 2;
-        if (Math.abs(walk) > 5) moved = true;
-        el.scrollLeft = scrollLeft - walk;
-    });
-    el.addEventListener('click', (e) => {
-        if (moved) { e.preventDefault(); e.stopPropagation(); }
-    }, true);
-}
+    function openSidebar() {
+        state.sidebarOpen = true;
+        els.sidebar.classList.add('open');
+        els.overlay.classList.add('active');
+        els.sidebarTrigger.classList.add('hidden');
+    }
 
-// ===== EVENTS =====
-function bindEvents() {
-    DOM.tabBtns.forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+    function closeSidebar() {
+        state.sidebarOpen = false;
+        els.sidebar.classList.remove('open');
+        els.overlay.classList.remove('active');
+        els.sidebarTrigger.classList.remove('hidden');
+    }
 
-    DOM.planSearchInput.addEventListener('input', handlePlanSearch);
-    DOM.planSearchClear.addEventListener('click', () => { resetPlanSearch(); renderPlanList(); });
+    // ---- Swipe ----
 
-    DOM.cartSearchInput.addEventListener('input', handleCartSearch);
-    DOM.cartSearchClear.addEventListener('click', () => resetCartSearch());
+    var swStartX = 0, swStartY = 0, swTime = 0, swActive = false;
 
-    DOM.addPlanItemBtn.addEventListener('click', () => openModal('add-plan'));
-    DOM.addCartItemBtn.addEventListener('click', () => openModal('add-cart'));
+    document.addEventListener('touchstart', function (e) {
+        var t = e.touches[0];
+        swStartX = t.clientX;
+        swStartY = t.clientY;
+        swTime = Date.now();
+        swActive = false;
+        if (!state.sidebarOpen && !state.editMode && swStartX < 35) swActive = true;
+        if (state.sidebarOpen) swActive = true;
+    }, { passive: true });
 
-    DOM.catChips.forEach(chip => {
-        chip.addEventListener('click', () => {
-            DOM.planSearchInput.value = '';
-            DOM.planSearchClear.classList.remove('show');
-            DOM.planSearchInput.blur();
-            DOM.catChips.forEach(c => c.classList.remove('active'));
-            chip.classList.add('active');
-            activeCategory = chip.dataset.category;
-            skipPlanSearch = true;
-            renderPlanList();
+    document.addEventListener('touchend', function (e) {
+        if (!swActive) return;
+        var t = e.changedTouches[0];
+        var dx = t.clientX - swStartX;
+        var dy = Math.abs(t.clientY - swStartY);
+        var dt = Date.now() - swTime;
+        if (dy > Math.abs(dx)) return;
+        if (!state.sidebarOpen && dx > 60 && dt < 500) openSidebar();
+        if (state.sidebarOpen && dx < -60 && dt < 500) closeSidebar();
+        swActive = false;
+    }, { passive: true });
+
+    // ---- Page CRUD ----
+
+    function addPage(name, url) {
+        var nu = normalizeUrl(url);
+        if (!nu) { showToast('Please enter a valid URL', 'error'); return; }
+        if (!name.trim()) name = getDomain(nu);
+        if (state.pages.find(function (p) { return p.url === nu; })) {
+            showToast('This URL already exists', 'error'); return;
+        }
+        var page = { id: generateId(), name: name.trim(), url: nu, addedAt: Date.now() };
+        state.pages.push(page);
+        state.activePageId = page.id;
+        saveState();
+        els.urlName.value = '';
+        els.urlInput.value = '';
+        ensureActiveTabPage();
+        renderAll();
+        closeSidebar();
+        showToast(page.name + ' added');
+    }
+
+    function removePage(id) {
+        var page = state.pages.find(function (p) { return p.id === id; });
+        if (!page) return Promise.resolve();
+        return showConfirm('Remove Website', 'Remove <strong>' + escapeHtml(page.name) + '</strong>?').then(function (ok) {
+            if (!ok) return;
+            state.pages = state.pages.filter(function (p) { return p.id !== id; });
+            var w = document.querySelector('.iframe-wrapper[data-id="' + id + '"]');
+            if (w) w.remove();
+            if (state.activePageId === id) {
+                state.activePageId = state.pages.length > 0 ? state.pages[0].id : null;
+            }
+            saveState();
+            clampTabPage();
+            renderAll();
+            showToast(page.name + ' removed');
         });
-    });
+    }
 
-    DOM.sortBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        updateSortDropdown();
-        DOM.sortDropdown.classList.toggle('show');
-    });
+    function updatePage(id, newName, newUrl) {
+        var page = state.pages.find(function (p) { return p.id === id; });
+        if (!page) return false;
+        var nu = normalizeUrl(newUrl);
+        if (!nu) { showToast('Please enter a valid URL', 'error'); return false; }
+        if (!newName.trim()) newName = getDomain(nu);
+        if (state.pages.find(function (p) { return p.url === nu && p.id !== id; })) {
+            showToast('This URL already exists', 'error'); return false;
+        }
+        var urlChanged = page.url !== nu;
+        page.name = newName.trim();
+        page.url = nu;
+        saveState();
+        if (urlChanged) {
+            var w = document.querySelector('.iframe-wrapper[data-id="' + id + '"]');
+            if (w) w.remove();
+        }
+        renderAll();
+        showToast(page.name + ' updated');
+        return true;
+    }
 
-    document.addEventListener('click', (e) => {
-        DOM.sortDropdown.classList.remove('show');
-        if (!e.target.closest('.list-item')) closeRevealedItem();
-    });
+    function switchPage(id) {
+        if (state.activePageId === id) return;
+        state.activePageId = id;
+        saveState();
+        ensureActiveTabPage();
+        renderIframes();
+        renderTabs();
+        renderPagesList();
+    }
 
-    DOM.clearAllBtn.addEventListener('click', () => {
-        if (Store.planItems.length === 0 && Store.cartItems.length === 0) {
-            showToast('Nothing to clear', 'info');
+    // ---- Tab Pagination ----
+
+    function getMaxTabPage() {
+        var tpp = getTabsPerPage();
+        return Math.max(0, Math.ceil(state.pages.length / tpp) - 1);
+    }
+
+    function clampTabPage() {
+        var max = getMaxTabPage();
+        if (state.tabPage > max) state.tabPage = max;
+        if (state.tabPage < 0) state.tabPage = 0;
+    }
+
+    function ensureActiveTabPage() {
+        if (!state.activePageId) return;
+        var idx = -1;
+        for (var i = 0; i < state.pages.length; i++) {
+            if (state.pages[i].id === state.activePageId) { idx = i; break; }
+        }
+        if (idx === -1) return;
+        var tpp = getTabsPerPage();
+        state.tabPage = Math.floor(idx / tpp);
+    }
+
+    // ---- Rendering ----
+
+    function renderAll() {
+        renderEmptyState();
+        renderPagesList();
+        renderIframes();
+        renderTabs();
+        if (state.editMode) renderEditGrid();
+    }
+
+    function renderEmptyState() {
+        if (state.pages.length === 0) {
+            els.emptyState.classList.remove('hidden');
+        } else {
+            els.emptyState.classList.add('hidden');
+        }
+    }
+
+    function renderPagesList() {
+        if (state.pages.length === 0) {
+            els.pagesList.innerHTML = '<div style="text-align:center;padding:20px 0;color:var(--text-muted);font-size:0.85rem;">No pages added yet</div>';
             return;
         }
-        showClearChoiceConfirm();
-    });
-
-    if (DOM.settingsBtn) {
-        DOM.settingsBtn.addEventListener('click', () => openModal('settings'));
-    }
-
-    DOM.modalClose.addEventListener('click', closeModal);
-    DOM.modalCancel.addEventListener('click', closeModal);
-    DOM.modalOverlay.addEventListener('click', (e) => { if (e.target === DOM.modalOverlay) closeModal(); });
-
-    DOM.confirmNo.addEventListener('click', closeConfirm);
-    DOM.confirmOverlay.addEventListener('click', (e) => { if (e.target === DOM.confirmOverlay) closeConfirm(); });
-
-    DOM.planSearchInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const val = DOM.planSearchInput.value.trim();
-            if (!val) return;
-            const exists = Store.planItems.find(i => i.name.toLowerCase() === val.toLowerCase());
-            if (!exists) openModal('add-plan', val);
-        }
-    });
-
-    DOM.cartSearchInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const val = DOM.cartSearchInput.value.trim();
-            if (!val) return;
-            const planItem = Store.planItems.find(i => i.name.toLowerCase() === val.toLowerCase());
-            if (!planItem) {
-                openModal('add-cart', val);
-            } else if (!isItemInCart(planItem.id)) {
-                openModal('send-to-cart', null, planItem.id);
-            }
-        }
-    });
-}
-
-// ===== TAB SWITCHING =====
-function switchTab(tab) {
-    closeRevealedItem();
-    currentTab = tab;
-    DOM.tabBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
-    DOM.planningTab.classList.toggle('active', tab === 'planning');
-    DOM.shoppingTab.classList.toggle('active', tab === 'shopping');
-    updateSortDropdown();
-}
-
-// ===== HELPERS =====
-function isItemInCart(planId) { return Store.cartItems.some(c => c.planId === planId); }
-
-function escapeHtml(text) {
-    const d = document.createElement('div');
-    d.textContent = text;
-    return d.innerHTML;
-}
-
-function capitalizeFirst(str) { return str.charAt(0).toUpperCase() + str.slice(1); }
-
-function getCategoryInfo(id) { return CATEGORIES.find(c => c.id === id) || CATEGORIES[CATEGORIES.length - 1]; }
-
-function isMobile() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 768; }
-
-function sortPlanItems(items) {
-    const s = [...items];
-    switch (planSort) {
-        case 'unchecked-first':
-            return s.sort((a, b) => {
-                const d = (isItemInCart(a.id) ? 1 : 0) - (isItemInCart(b.id) ? 1 : 0);
-                return d !== 0 ? d : a.name.localeCompare(b.name);
-            });
-        case 'checked-first':
-            return s.sort((a, b) => {
-                const d = (isItemInCart(a.id) ? 0 : 1) - (isItemInCart(b.id) ? 0 : 1);
-                return d !== 0 ? d : a.name.localeCompare(b.name);
-            });
-        default: return s;
-    }
-}
-
-function sortCartItems(items) {
-    const s = [...items];
-    switch (cartSort) {
-        case 'alpha-asc': return s.sort((a, b) => a.name.localeCompare(b.name));
-        case 'alpha-desc': return s.sort((a, b) => b.name.localeCompare(a.name));
-        case 'price-asc': return s.sort((a, b) => getItemTotal(a) - getItemTotal(b));
-        case 'price-desc': return s.sort((a, b) => getItemTotal(b) - getItemTotal(a));
-        default: return s;
-    }
-}
-
-// ===== ITEM CALCULATIONS =====
-function getItemSubtotal(item) {
-    return (item.price || 0) * (item.quantity || 1);
-}
-
-function getItemTax(item) {
-    if (!item.hasTax || Store.settings.salesTaxRate <= 0) return 0;
-    return getItemSubtotal(item) * (Store.settings.salesTaxRate / 100);
-}
-
-function getItemDeposit(item) {
-    if (!item.hasDeposit || !item.depositCount || Store.settings.depositAmount <= 0) return 0;
-    return item.depositCount * Store.settings.depositAmount;
-}
-
-function getItemTotal(item) {
-    return getItemSubtotal(item) + getItemTax(item) + getItemDeposit(item);
-}
-
-// ===== PLAN LIST =====
-function handlePlanSearch() {
-    const val = DOM.planSearchInput.value.trim();
-    DOM.planSearchClear.classList.toggle('show', val.length > 0);
-    renderPlanList();
-}
-
-function renderPlanList() {
-    let items = [...Store.planItems];
-    let searchTerm = '';
-
-    if (skipPlanSearch) {
-        skipPlanSearch = false;
-    } else {
-        searchTerm = DOM.planSearchInput.value.trim().toLowerCase();
-    }
-
-    if (activeCategory !== 'all') {
-        items = items.filter(item => item.category === activeCategory);
-    }
-
-    if (searchTerm) {
-        items = items.filter(item => item.name.toLowerCase().includes(searchTerm));
-    }
-
-    items = sortPlanItems(items);
-    DOM.planList.innerHTML = '';
-
-    if (items.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'empty-state';
-        const enterText = isMobile() ? 'return' : 'Enter';
-
-        if (searchTerm) {
-            empty.innerHTML = `
-                <i class="fas fa-magnifying-glass"></i>
-                <h3>No Items Found</h3>
-                <p>No results for "<strong>${escapeHtml(searchTerm)}</strong>"</p>
-                <p class="empty-hint">Press <kbd>${enterText}</kbd> to add "<strong>${escapeHtml(searchTerm)}</strong>" as a new item</p>
-            `;
-        } else if (Store.planItems.length === 0) {
-            empty.innerHTML = `
-                <i class="fas fa-clipboard-list"></i>
-                <h3>Start Your Shopping List</h3>
-                <p>Add items you need to buy before heading to the store</p>
-            `;
-        } else {
-            empty.innerHTML = `
-                <i class="fas fa-magnifying-glass"></i>
-                <h3>No Items Found</h3>
-                <p>Try a different search or category filter</p>
-            `;
-        }
-        DOM.planList.appendChild(empty);
-        return;
-    }
-
-    if (searchTerm) {
-        const exactMatch = Store.planItems.find(i => i.name.toLowerCase() === searchTerm);
-        if (!exactMatch) {
-            const enterText = isMobile() ? 'return' : 'Enter';
-            const hint = document.createElement('div');
-            hint.className = 'search-add-hint';
-            hint.innerHTML = `<i class="fas fa-plus-circle"></i> Press <kbd>${enterText}</kbd> to add "<strong>${escapeHtml(searchTerm)}</strong>"`;
-            hint.addEventListener('click', () => openModal('add-plan', DOM.planSearchInput.value.trim()));
-            DOM.planList.appendChild(hint);
-        }
-    }
-
-    items.forEach((item, idx) => DOM.planList.appendChild(createPlanItem(item, idx)));
-}
-
-function createPlanItem(item, idx) {
-    const div = document.createElement('div');
-    const inCart = isItemInCart(item.id);
-    div.className = 'list-item';
-    if (inCart) div.classList.add('checked', 'checked-locked');
-    div.style.animationDelay = `${idx * 0.03}s`;
-
-    const cat = getCategoryInfo(item.category);
-
-    div.innerHTML = `
-        <div class="item-check${inCart ? ' checked locked' : ''}">
-            <i class="fas fa-check"></i>
-        </div>
-        <div class="item-info">
-            <div class="item-name">${escapeHtml(item.name)}</div>
-            <div class="item-meta">
-                <span class="item-category">${escapeHtml(cat.label)}</span>
-                ${item.quantity > 1 ? `<span class="item-qty">×${item.quantity}</span>` : ''}
-                ${inCart ? '<span class="item-in-cart-badge"><i class="fas fa-cart-shopping"></i> In cart</span>' : ''}
-            </div>
-        </div>
-        ${!inCart ? `<button class="item-action-btn send" title="Send to Cart" data-action="send"><i class="fas fa-cart-plus"></i></button>` : ''}
-        <div class="item-actions">
-            <button class="item-action-btn edit" title="Edit" data-action="edit-plan"><i class="fas fa-pen"></i></button>
-            <button class="item-action-btn delete" title="Delete" data-action="delete-plan"><i class="fas fa-trash-can"></i></button>
-        </div>
-    `;
-
-    div.addEventListener('click', (e) => {
-        if (e.target.closest('[data-action]')) return;
-        e.stopPropagation();
-        revealItem(item.id, div);
-    });
-
-    const sendBtn = div.querySelector('[data-action="send"]');
-    if (sendBtn) {
-        sendBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); closeRevealedItem();
-            openModal('send-to-cart', null, item.id);
+        els.pagesList.innerHTML = '';
+        state.pages.forEach(function (page) {
+            var isActive = page.id === state.activePageId;
+            var item = document.createElement('div');
+            item.className = 'page-item' + (isActive ? ' active' : '');
+            var dot = document.createElement('div');
+            dot.className = 'page-item-dot';
+            var info = document.createElement('div');
+            info.className = 'page-item-info';
+            info.innerHTML = '<div class="page-item-name">' + escapeHtml(page.name) + '</div><div class="page-item-url">' + escapeHtml(getDomain(page.url)) + '</div>';
+            item.appendChild(dot);
+            item.appendChild(info);
+            item.addEventListener('click', function () { switchPage(page.id); closeSidebar(); });
+            els.pagesList.appendChild(item);
         });
     }
 
-    div.querySelector('[data-action="edit-plan"]').addEventListener('click', (e) => {
-        e.stopPropagation(); closeRevealedItem();
-        openModal('edit-plan', null, item.id);
-    });
+    function renderIframes() {
+        var existing = {};
+        els.iframeContainer.querySelectorAll('.iframe-wrapper').forEach(function (w) {
+            existing[w.dataset.id] = w;
+        });
 
-    div.querySelector('[data-action="delete-plan"]').addEventListener('click', (e) => {
-        e.stopPropagation(); closeRevealedItem();
-        const linked = Store.cartItems.find(c => c.planId === item.id);
+        state.pages.forEach(function (page) {
+            if (!existing[page.id]) {
+                createIframeWrapper(page);
+            }
+        });
 
-        if (linked) {
-            showDeleteChoiceConfirm('Remove Item', `"${item.name}" is also in your shopping cart. What would you like to do?`, {
-                planOnly: {
-                    label: 'Remove from Plan Only', icon: 'fa-clipboard-list',
-                    callback: () => {
-                        Store.planItems = Store.planItems.filter(i => i.id !== item.id);
-                        const ci = Store.cartItems.find(c => c.planId === item.id);
-                        if (ci) ci.planId = null;
-                        Store.save(); renderAll();
-                        showToast(`"${item.name}" removed from plan`, 'success');
-                    }
-                },
-                both: {
-                    label: 'Remove from Both', icon: 'fa-trash-can',
-                    callback: () => {
-                        Store.cartItems = Store.cartItems.filter(c => c.planId !== item.id);
-                        Store.planItems = Store.planItems.filter(i => i.id !== item.id);
-                        Store.save(); renderAll();
-                        showToast(`"${item.name}" removed from plan and cart`, 'success');
-                    }
-                }
-            });
+        els.iframeContainer.querySelectorAll('.iframe-wrapper').forEach(function (w) {
+            if (!state.pages.find(function (p) { return p.id === w.dataset.id; })) {
+                w.remove();
+            }
+        });
+
+        els.iframeContainer.querySelectorAll('.iframe-wrapper').forEach(function (w) {
+            if (w.dataset.id === state.activePageId) {
+                w.classList.add('active');
+            } else {
+                w.classList.remove('active');
+            }
+        });
+    }
+
+    function createIframeWrapper(page) {
+        var wrapper = document.createElement('div');
+        wrapper.className = 'iframe-wrapper';
+        wrapper.dataset.id = page.id;
+
+        var loading = document.createElement('div');
+        loading.className = 'iframe-loading';
+        loading.innerHTML = '<div class="spinner"></div><span>Loading ' + escapeHtml(page.name) + '…</span>';
+
+        var iframe = document.createElement('iframe');
+        iframe.src = page.url;
+        iframe.title = page.name;
+        iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen');
+        iframe.setAttribute('allowfullscreen', '');
+        iframe.setAttribute('loading', 'lazy');
+        // No sandbox — allows full interactivity (swipe, scroll, touch events inside embedded sites)
+
+        iframe.addEventListener('load', function () { loading.classList.add('hidden'); });
+        iframe.addEventListener('error', function () {
+            loading.innerHTML =
+                '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>' +
+                '<span>Failed to load ' + escapeHtml(page.name) + '</span>';
+        });
+
+        wrapper.appendChild(loading);
+        wrapper.appendChild(iframe);
+        els.iframeContainer.appendChild(wrapper);
+    }
+
+    function renderTabs() {
+        if (state.pages.length <= 1) {
+            els.tabsBar.classList.remove('visible');
+            return;
+        }
+
+        els.tabsBar.classList.add('visible');
+
+        var tpp = getTabsPerPage();
+        var totalPages = Math.ceil(state.pages.length / tpp);
+        clampTabPage();
+
+        var start = state.tabPage * tpp;
+        var end = Math.min(start + tpp, state.pages.length);
+        var visiblePages = state.pages.slice(start, end);
+
+        // Arrows
+        if (totalPages > 1) {
+            els.tabArrowLeft.classList.add('visible');
+            els.tabArrowRight.classList.add('visible');
+            els.tabArrowLeft.disabled = state.tabPage === 0;
+            els.tabArrowRight.disabled = state.tabPage >= totalPages - 1;
+            els.tabArrowLeft.style.opacity = state.tabPage === 0 ? '0.3' : '1';
+            els.tabArrowRight.style.opacity = state.tabPage >= totalPages - 1 ? '0.3' : '1';
         } else {
-            showConfirm('Remove Item?', `Remove "${item.name}" from your planning list?`, () => {
-                Store.planItems = Store.planItems.filter(i => i.id !== item.id);
-                Store.save(); renderAll();
-                showToast(`"${item.name}" removed`, 'success');
-            });
+            els.tabArrowLeft.classList.remove('visible');
+            els.tabArrowRight.classList.remove('visible');
         }
-    });
 
-    return div;
-}
-
-// ===== CART LIST =====
-function handleCartSearch() {
-    const val = DOM.cartSearchInput.value.trim().toLowerCase();
-    DOM.cartSearchClear.classList.toggle('show', val.length > 0);
-
-    if (val.length > 0) {
-        const results = Store.planItems.filter(item => item.name.toLowerCase().includes(val));
-        if (results.length > 0) {
-            renderSearchResults(results);
-            DOM.searchResultsPanel.classList.add('show');
-        } else {
-            renderSearchResultsEmpty(val);
-            DOM.searchResultsPanel.classList.add('show');
-        }
-    } else {
-        DOM.searchResultsPanel.classList.remove('show');
-    }
-}
-
-function renderSearchResultsEmpty(searchTerm) {
-    DOM.searchResultsList.innerHTML = '';
-    const enterText = isMobile() ? 'return' : 'Enter';
-    const div = document.createElement('div');
-    div.className = 'search-empty-hint';
-    div.innerHTML = `
-        <div class="empty-hint-icon"><i class="fas fa-magnifying-glass"></i></div>
-        <p>No items found for "<strong>${escapeHtml(searchTerm)}</strong>"</p>
-        <p class="empty-hint-action">Press <kbd>${enterText}</kbd> to add it as a new item</p>
-    `;
-    div.addEventListener('click', () => openModal('add-cart', DOM.cartSearchInput.value.trim()));
-    DOM.searchResultsList.appendChild(div);
-}
-
-function renderSearchResults(results) {
-    DOM.searchResultsList.innerHTML = '';
-    const searchTerm = DOM.cartSearchInput.value.trim().toLowerCase();
-    const exactMatch = Store.planItems.find(i => i.name.toLowerCase() === searchTerm);
-
-    if (!exactMatch && searchTerm) {
-        const enterText = isMobile() ? 'return' : 'Enter';
-        const hintDiv = document.createElement('div');
-        hintDiv.className = 'search-add-hint';
-        hintDiv.innerHTML = `<i class="fas fa-plus-circle"></i> Press <kbd>${enterText}</kbd> to add "<strong>${escapeHtml(searchTerm)}</strong>" as new`;
-        hintDiv.addEventListener('click', () => openModal('add-cart', DOM.cartSearchInput.value.trim()));
-        DOM.searchResultsList.appendChild(hintDiv);
+        // Tabs
+        els.tabsWindow.innerHTML = '';
+        visiblePages.forEach(function (page) {
+            var tab = document.createElement('div');
+            tab.className = 'tab-item' + (page.id === state.activePageId ? ' active' : '');
+            tab.textContent = page.name;
+            tab.addEventListener('click', function () { switchPage(page.id); });
+            els.tabsWindow.appendChild(tab);
+        });
     }
 
-    results.forEach(item => {
-        const inCart = isItemInCart(item.id);
-        const div = document.createElement('div');
-        div.className = `search-result-item${inCart ? ' already-added' : ''}`;
-        const cat = getCategoryInfo(item.category);
+    // ---- Edit Mode ----
 
-        div.innerHTML = `
-            <div class="result-icon"><i class="fas ${cat.icon}"></i></div>
-            <div style="flex:1;min-width:0;">
-                <div class="result-name">${escapeHtml(item.name)}</div>
-                <div class="result-category">${escapeHtml(cat.label)}${item.quantity > 1 ? ` × ${item.quantity}` : ''}</div>
-            </div>
-            <div class="result-add">${inCart ? '<i class="fas fa-circle-check"></i>' : '<i class="fas fa-plus-circle"></i>'}</div>
-        `;
-
-        if (!inCart) {
-            div.addEventListener('click', () => {
-                openModal('send-to-cart', null, item.id);
-                resetCartSearch();
-            });
-        }
-        DOM.searchResultsList.appendChild(div);
-    });
-}
-
-function renderCartList() {
-    let items = sortCartItems([...Store.cartItems]);
-    DOM.cartList.innerHTML = '';
-
-    if (items.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'empty-state';
-        empty.innerHTML = `
-            <i class="fas fa-basket-shopping"></i>
-            <h3>Your Cart is Empty</h3>
-            <p>Search your planned items above or add new items directly</p>
-        `;
-        DOM.cartList.appendChild(empty);
-        return;
+    function enterEditMode() {
+        state.editMode = true;
+        els.editOverlay.classList.add('active');
+        closeSidebar();
+        renderEditGrid();
     }
 
-    items.forEach((item, idx) => DOM.cartList.appendChild(createCartItem(item, idx)));
-}
-
-function createCartItem(item, idx) {
-    const div = document.createElement('div');
-    div.className = 'list-item';
-    div.style.animationDelay = `${idx * 0.03}s`;
-
-    const cat = getCategoryInfo(item.category);
-    const subtotal = getItemSubtotal(item);
-    const tax = getItemTax(item);
-    const deposit = getItemDeposit(item);
-    const total = getItemTotal(item);
-
-    let metaTags = `<span class="item-category">${escapeHtml(cat.label)}</span>`;
-    if (item.quantity > 1) metaTags += `<span class="item-qty">×${item.quantity}</span>`;
-    if (item.hasTax && Store.settings.salesTaxRate > 0) metaTags += `<span class="item-tag tax-tag"><i class="fas fa-percent"></i> Tax</span>`;
-    if (item.hasDeposit && item.depositCount > 0) metaTags += `<span class="item-tag deposit-tag"><i class="fas fa-recycle"></i> ${item.depositCount}×dep</span>`;
-
-    let priceBreakdown = '';
-    if (tax > 0 || deposit > 0) {
-        let parts = [];
-        if (tax > 0) parts.push(`+$${tax.toFixed(2)} tax`);
-        if (deposit > 0) parts.push(`+$${deposit.toFixed(2)} dep`);
-        priceBreakdown = `<div class="item-price-breakdown">${parts.join(' ')}</div>`;
-    }
-
-    div.innerHTML = `
-        <div class="item-info">
-            <div class="item-name">${escapeHtml(item.name)}</div>
-            <div class="item-meta">${metaTags}</div>
-        </div>
-        <div class="item-price-wrap">
-            <div class="item-price">$${total.toFixed(2)}</div>
-            ${priceBreakdown}
-        </div>
-        <div class="item-actions">
-            <button class="item-action-btn edit" title="Edit" data-action="edit-cart"><i class="fas fa-pen"></i></button>
-            <button class="item-action-btn delete" title="Remove" data-action="delete-cart"><i class="fas fa-trash-can"></i></button>
-        </div>
-    `;
-
-    div.addEventListener('click', (e) => {
-        if (e.target.closest('[data-action]')) return;
-        e.stopPropagation();
-        revealItem(item.id, div);
-    });
-
-    div.querySelector('[data-action="edit-cart"]').addEventListener('click', (e) => {
-        e.stopPropagation(); closeRevealedItem();
-        openModal('edit-cart', null, item.id);
-    });
-
-    div.querySelector('[data-action="delete-cart"]').addEventListener('click', (e) => {
-        e.stopPropagation(); closeRevealedItem();
-        const linkedPlan = item.planId ? Store.planItems.find(p => p.id === item.planId) : null;
-
-        if (linkedPlan) {
-            showDeleteChoiceConfirm('Remove Item', `"${item.name}" is also in your plan list. What would you like to do?`, {
-                planOnly: {
-                    label: 'Remove from Cart Only', icon: 'fa-cart-shopping',
-                    callback: () => {
-                        Store.cartItems = Store.cartItems.filter(i => i.id !== item.id);
-                        Store.save(); renderAll();
-                        showToast(`"${item.name}" removed from cart`, 'success');
-                    }
-                },
-                both: {
-                    label: 'Remove from Both', icon: 'fa-trash-can',
-                    callback: () => {
-                        Store.planItems = Store.planItems.filter(p => p.id !== linkedPlan.id);
-                        Store.cartItems = Store.cartItems.filter(i => i.id !== item.id);
-                        Store.save(); renderAll();
-                        showToast(`"${item.name}" removed from cart and plan`, 'success');
-                    }
-                }
-            });
-        } else {
-            showConfirm('Remove from Cart?', `Remove "${item.name}" from your shopping cart?`, () => {
-                Store.cartItems = Store.cartItems.filter(i => i.id !== item.id);
-                Store.save(); renderAll();
-                showToast(`"${item.name}" removed from cart`, 'success');
-            });
-        }
-    });
-
-    return div;
-}
-
-// ===== COUNTS & TOTALS =====
-function updateCounts() {
-    DOM.planCount.textContent = Store.planItems.length;
-    DOM.cartCount.textContent = Store.cartItems.length;
-    DOM.totalItems.textContent = Store.cartItems.length;
-    const inCartCount = Store.planItems.filter(p => isItemInCart(p.id)).length;
-    DOM.checkedItems.textContent = `${inCartCount}/${Store.planItems.length}`;
-}
-
-function updateTotals() {
-    const subtotal = Store.cartItems.reduce((sum, item) => sum + getItemSubtotal(item), 0);
-    const totalTax = Store.cartItems.reduce((sum, item) => sum + getItemTax(item), 0);
-    const totalDeposit = Store.cartItems.reduce((sum, item) => sum + getItemDeposit(item), 0);
-    const grandTotal = subtotal + totalTax + totalDeposit;
-
-    DOM.runningTotal.textContent = '$' + grandTotal.toFixed(2);
-    DOM.headerTotal.querySelector('span').textContent = '$' + grandTotal.toFixed(2);
-
-    // Breakdown
-    if (totalTax > 0 || totalDeposit > 0) {
-        let html = `<div class="breakdown-item subtotal-breakdown"><span class="breakdown-label">Subtotal:</span> <span class="breakdown-value">$${subtotal.toFixed(2)}</span></div>`;
-        if (totalTax > 0) {
-            html += `<div class="breakdown-item tax-breakdown"><span class="breakdown-label">Tax:</span> <span class="breakdown-value">$${totalTax.toFixed(2)}</span></div>`;
-        }
-        if (totalDeposit > 0) {
-            html += `<div class="breakdown-item deposit-breakdown"><span class="breakdown-label">Deposit:</span> <span class="breakdown-value">$${totalDeposit.toFixed(2)}</span></div>`;
-        }
-        DOM.totalsBreakdown.innerHTML = html;
-        DOM.totalsBreakdown.classList.add('show');
-    } else {
-        DOM.totalsBreakdown.innerHTML = '';
-        DOM.totalsBreakdown.classList.remove('show');
-    }
-}
-
-// ===== MODAL =====
-function openModal(mode, prefillName, itemId) {
-    closeRevealedItem();
-    prefillName = prefillName || null;
-    itemId = itemId || null;
-    modalMode = mode;
-    editingItemId = itemId;
-
-    let title = '';
-    let bodyHTML = '';
-
-    const categoryOptions = CATEGORIES.map(c => `<option value="${c.id}">${c.label}</option>`).join('');
-    const hasTaxRate = Store.settings.salesTaxRate > 0;
-    const hasDepositAmt = Store.settings.depositAmount > 0;
-
-    switch (mode) {
-        case 'settings': {
-            title = 'Settings';
-            bodyHTML = `
-                <div class="settings-section">
-                    <div class="settings-section-title"><i class="fas fa-percent"></i> Sales Tax</div>
-                    <div class="form-group">
-                        <label class="form-label">Tax Rate (%)</label>
-                        <input type="number" class="form-input" id="inputTaxRate" placeholder="e.g. 6.25" step="0.01" min="0" max="25" value="${Store.settings.salesTaxRate || ''}">
-                        <div class="form-hint">Enter your state/local sales tax percentage</div>
-                    </div>
-                </div>
-                <div class="settings-section">
-                    <div class="settings-section-title"><i class="fas fa-recycle"></i> Bottle/Can Deposit</div>
-                    <div class="form-group">
-                        <label class="form-label">Deposit Per Container ($)</label>
-                        <input type="number" class="form-input" id="inputDepositAmount" placeholder="e.g. 0.05 or 0.10" step="0.01" min="0" max="1" value="${Store.settings.depositAmount || ''}">
-                        <div class="form-hint">Enter your state's bottle/can deposit amount</div>
-                    </div>
-                </div>
-            `;
-            break;
-        }
-        case 'add-plan': {
-            title = 'Add to Plan';
-            bodyHTML = `
-                <div class="form-group">
-                    <label class="form-label">Item Name</label>
-                    <input type="text" class="form-input" id="inputName" placeholder="e.g. Organic Milk" value="${prefillName ? escapeHtml(prefillName) : ''}">
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">Category</label><select class="form-select" id="inputCategory">${categoryOptions}</select></div>
-                    <div class="form-group"><label class="form-label">Quantity</label><input type="number" class="form-input" id="inputQuantity" value="1" min="1" max="99"></div>
-                </div>
-            `;
-            break;
-        }
-        case 'edit-plan': {
-            const item = Store.planItems.find(i => i.id === itemId);
-            if (!item) return;
-            title = 'Edit Plan Item';
-            bodyHTML = `
-                <div class="form-group">
-                    <label class="form-label">Item Name</label>
-                    <input type="text" class="form-input" id="inputName" value="${escapeHtml(item.name)}">
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">Category</label>
-                        <select class="form-select" id="inputCategory">${CATEGORIES.map(c => `<option value="${c.id}"${c.id === item.category ? ' selected' : ''}>${c.label}</option>`).join('')}</select>
-                    </div>
-                    <div class="form-group"><label class="form-label">Quantity</label><input type="number" class="form-input" id="inputQuantity" value="${item.quantity || 1}" min="1" max="99"></div>
-                </div>
-            `;
-            break;
-        }
-        case 'send-to-cart': {
-            const item = Store.planItems.find(i => i.id === itemId);
-            if (!item) return;
-            title = 'Add to Cart';
-            bodyHTML = `
-                <div class="form-group">
-                    <label class="form-label">Item</label>
-                    <input type="text" class="form-input" id="inputName" value="${escapeHtml(item.name)}" readonly style="opacity:0.7">
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">Price ($)</label><input type="number" class="form-input price-input" id="inputPrice" placeholder="0.00" step="0.01" min="0"></div>
-                    <div class="form-group"><label class="form-label">Quantity</label><input type="number" class="form-input" id="inputQuantity" value="${item.quantity || 1}" min="1" max="99"></div>
-                </div>
-                ${buildExtrasHTML(hasTaxRate, hasDepositAmt, false, false, 0)}
-            `;
-            break;
-        }
-        case 'add-cart': {
-            title = 'Add New Cart Item';
-            bodyHTML = `
-                <div class="form-group">
-                    <label class="form-label">Item Name</label>
-                    <input type="text" class="form-input" id="inputName" placeholder="e.g. Avocados" value="${prefillName ? escapeHtml(prefillName) : ''}">
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">Price ($)</label><input type="number" class="form-input price-input" id="inputPrice" placeholder="0.00" step="0.01" min="0"></div>
-                    <div class="form-group"><label class="form-label">Quantity</label><input type="number" class="form-input" id="inputQuantity" value="1" min="1" max="99"></div>
-                </div>
-                <div class="form-group"><label class="form-label">Category</label><select class="form-select" id="inputCategory">${categoryOptions}</select></div>
-                ${buildExtrasHTML(hasTaxRate, hasDepositAmt, false, false, 0)}
-            `;
-            break;
-        }
-        case 'edit-cart': {
-            const item = Store.cartItems.find(i => i.id === itemId);
-            if (!item) return;
-            title = 'Edit Cart Item';
-            bodyHTML = `
-                <div class="form-group">
-                    <label class="form-label">Item Name</label>
-                    <input type="text" class="form-input" id="inputName" value="${escapeHtml(item.name)}">
-                </div>
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">Price ($)</label><input type="number" class="form-input price-input" id="inputPrice" value="${item.price.toFixed(2)}" step="0.01" min="0"></div>
-                    <div class="form-group"><label class="form-label">Quantity</label><input type="number" class="form-input" id="inputQuantity" value="${item.quantity || 1}" min="1" max="99"></div>
-                </div>
-                <div class="form-group"><label class="form-label">Category</label>
-                    <select class="form-select" id="inputCategory">${CATEGORIES.map(c => `<option value="${c.id}"${c.id === item.category ? ' selected' : ''}>${c.label}</option>`).join('')}</select>
-                </div>
-                ${buildExtrasHTML(hasTaxRate, hasDepositAmt, item.hasTax, item.hasDeposit, item.depositCount)}
-            `;
-            break;
-        }
-    }
-
-    DOM.modalTitle.textContent = title;
-    DOM.modalBody.innerHTML = bodyHTML;
-    DOM.modalConfirm.onclick = handleModalConfirm;
-
-    setupDepositToggle();
-
-    DOM.modalBody.querySelectorAll('input').forEach(input => {
-        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleModalConfirm(); });
-    });
-
-    DOM.modalOverlay.classList.add('show');
-    setTimeout(() => {
-        const first = DOM.modalBody.querySelector('input:not([readonly])');
-        if (first) first.focus();
-    }, 350);
-}
-
-function buildExtrasHTML(hasTaxRate, hasDepositAmt, taxChecked, depositChecked, depositCount) {
-    if (!hasTaxRate && !hasDepositAmt) return '';
-
-    let html = '<div class="form-extras">';
-
-    if (hasTaxRate) {
-        html += `
-            <label class="custom-checkbox">
-                <input type="checkbox" id="inputHasTax" ${taxChecked ? 'checked' : ''}>
-                <span class="checkbox-mark"></span>
-                <span class="checkbox-label"><i class="fas fa-percent"></i> Taxable (${Store.settings.salesTaxRate}%)</span>
-            </label>
-        `;
-    }
-
-    if (hasDepositAmt) {
-        html += `
-            <label class="custom-checkbox">
-                <input type="checkbox" id="inputHasDeposit" ${depositChecked ? 'checked' : ''}>
-                <span class="checkbox-mark"></span>
-                <span class="checkbox-label"><i class="fas fa-recycle"></i> Bottle/Can Deposit ($${Store.settings.depositAmount.toFixed(2)}/ea)</span>
-            </label>
-            <div class="deposit-count-wrap" id="depositCountWrap" style="display:${depositChecked ? 'block' : 'none'};">
-                <label class="form-label">How many containers?</label>
-                <input type="number" class="form-input" id="inputDepositCount" placeholder="e.g. 24" min="1" max="999" value="${depositCount || ''}">
-                <div class="form-hint deposit-calc" id="depositCalc"></div>
-            </div>
-        `;
-    }
-
-    html += '</div>';
-    return html;
-}
-
-function setupDepositToggle() {
-    const cb = DOM.modalBody.querySelector('#inputHasDeposit');
-    const wrap = DOM.modalBody.querySelector('#depositCountWrap');
-    const countInput = DOM.modalBody.querySelector('#inputDepositCount');
-    const calc = DOM.modalBody.querySelector('#depositCalc');
-
-    if (!cb || !wrap) return;
-
-    cb.addEventListener('change', () => {
-        wrap.style.display = cb.checked ? 'block' : 'none';
-        if (cb.checked && countInput) setTimeout(() => countInput.focus(), 100);
-        updateCalc();
-    });
-
-    if (countInput) countInput.addEventListener('input', updateCalc);
-    updateCalc();
-
-    function updateCalc() {
-        if (!calc || !countInput) return;
-        const count = parseInt(countInput.value) || 0;
-        if (count > 0 && cb.checked) {
-            const total = count * Store.settings.depositAmount;
-            calc.textContent = `${count} × $${Store.settings.depositAmount.toFixed(2)} = $${total.toFixed(2)} deposit`;
-            calc.style.display = 'block';
-        } else {
-            calc.style.display = 'none';
-        }
-    }
-}
-
-function closeModal() {
-    DOM.modalOverlay.classList.remove('show');
-    modalMode = null;
-    editingItemId = null;
-}
-
-function handleModalConfirm() {
-    if (modalMode === 'settings') {
-        const taxRateEl = DOM.modalBody.querySelector('#inputTaxRate');
-        const depositAmtEl = DOM.modalBody.querySelector('#inputDepositAmount');
-        const taxRate = taxRateEl ? parseFloat(taxRateEl.value) || 0 : 0;
-        const depositAmt = depositAmtEl ? parseFloat(depositAmtEl.value) || 0 : 0;
-
-        if (taxRate < 0 || taxRate > 25) { showToast('Tax rate must be 0–25%', 'error'); return; }
-        if (depositAmt < 0 || depositAmt > 1) { showToast('Deposit must be $0.00–$1.00', 'error'); return; }
-
-        Store.settings.salesTaxRate = taxRate;
-        Store.settings.depositAmount = depositAmt;
-        Store.save();
-        closeModal();
+    function exitEditMode() {
+        state.editMode = false;
+        els.editOverlay.classList.remove('active');
         renderAll();
-        showToast('Settings saved', 'success');
-        return;
     }
 
-    const nameEl = DOM.modalBody.querySelector('#inputName');
-    const priceEl = DOM.modalBody.querySelector('#inputPrice');
-    const qtyEl = DOM.modalBody.querySelector('#inputQuantity');
-    const catEl = DOM.modalBody.querySelector('#inputCategory');
-    const hasTaxEl = DOM.modalBody.querySelector('#inputHasTax');
-    const hasDepositEl = DOM.modalBody.querySelector('#inputHasDeposit');
-    const depositCountEl = DOM.modalBody.querySelector('#inputDepositCount');
-
-    const name = nameEl ? nameEl.value.trim() : '';
-    const price = priceEl ? parseFloat(priceEl.value) || 0 : 0;
-    const quantity = qtyEl ? Math.max(1, parseInt(qtyEl.value) || 1) : 1;
-    const category = catEl ? catEl.value : 'other';
-    const hasTax = hasTaxEl ? hasTaxEl.checked : false;
-    const hasDeposit = hasDepositEl ? hasDepositEl.checked : false;
-    const depositCount = depositCountEl ? Math.max(0, parseInt(depositCountEl.value) || 0) : 0;
-
-    if (!name) { showToast('Please enter an item name', 'error'); if (nameEl) nameEl.focus(); return; }
-
-    let toastMsg = '';
-
-    switch (modalMode) {
-        case 'add-plan': {
-            if (Store.planItems.find(i => i.name.toLowerCase() === name.toLowerCase())) {
-                showToast(`"${name}" is already on your list`, 'error'); return;
-            }
-            Store.planItems.push({ id: Store.generateId(), name: capitalizeFirst(name), category, quantity, createdAt: Date.now() });
-            Store.save();
-            toastMsg = `"${capitalizeFirst(name)}" added to plan`;
-            break;
+    function renderEditGrid() {
+        if (state.pages.length === 0) {
+            els.editGrid.innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-muted);"><p>No websites to edit.</p></div>';
+            return;
         }
-        case 'edit-plan': {
-            const item = Store.planItems.find(i => i.id === editingItemId);
-            if (item) {
-                const oldQty = item.quantity;
-                item.name = capitalizeFirst(name); item.category = category; item.quantity = quantity;
-                const linked = Store.cartItems.find(c => c.planId === item.id);
-                if (linked) { linked.name = item.name; linked.category = item.category; if (oldQty !== quantity) linked.quantity = quantity; }
-                Store.save();
-                toastMsg = `"${item.name}" updated`;
-            }
-            break;
-        }
-        case 'send-to-cart': {
-            const planItem = Store.planItems.find(i => i.id === editingItemId);
-            if (!planItem) break;
-            if (isItemInCart(planItem.id)) { showToast(`"${planItem.name}" is already in your cart`, 'info'); closeModal(); return; }
-            if (price <= 0) { showToast('Please enter a valid price', 'error'); if (priceEl) priceEl.focus(); return; }
-            if (hasDeposit && depositCount <= 0) { showToast('Please enter number of containers', 'error'); if (depositCountEl) depositCountEl.focus(); return; }
 
-            planItem.quantity = quantity;
-            const cartItem = {
-                id: Store.generateId(), planId: planItem.id, name: planItem.name, category: planItem.category,
-                price, quantity, hasTax, hasDeposit, depositCount: hasDeposit ? depositCount : 0, createdAt: Date.now()
+        els.editGrid.innerHTML = '';
+
+        state.pages.forEach(function (page, index) {
+            var card = document.createElement('div');
+            card.className = 'edit-card';
+            card.dataset.id = page.id;
+            card.dataset.index = index;
+
+            var body = document.createElement('div');
+            body.className = 'edit-card-body';
+
+            // Drag handle
+            var dragBtn = document.createElement('button');
+            dragBtn.className = 'edit-card-btn drag-btn';
+            dragBtn.setAttribute('aria-label', 'Drag to reorder');
+            dragBtn.innerHTML =
+                '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">' +
+                '<circle cx="9" cy="5" r="1.8"></circle><circle cx="15" cy="5" r="1.8"></circle>' +
+                '<circle cx="9" cy="12" r="1.8"></circle><circle cx="15" cy="12" r="1.8"></circle>' +
+                '<circle cx="9" cy="19" r="1.8"></circle><circle cx="15" cy="19" r="1.8"></circle></svg>';
+
+            var info = document.createElement('div');
+            info.className = 'edit-card-info';
+            info.innerHTML = '<div class="edit-card-name">' + escapeHtml(page.name) + '</div><div class="edit-card-url">' + escapeHtml(page.url) + '</div>';
+
+            var actions = document.createElement('div');
+            actions.className = 'edit-card-actions';
+
+            // Edit button
+            var editBtn = document.createElement('button');
+            editBtn.className = 'edit-card-btn edit-btn';
+            editBtn.setAttribute('aria-label', 'Edit');
+            editBtn.innerHTML =
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>' +
+                '<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
+
+            // Delete button
+            var deleteBtn = document.createElement('button');
+            deleteBtn.className = 'edit-card-btn delete-btn';
+            deleteBtn.setAttribute('aria-label', 'Remove');
+            deleteBtn.innerHTML =
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">' +
+                '<polyline points="3 6 5 6 21 6"></polyline>' +
+                '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+
+            actions.appendChild(editBtn);
+            actions.appendChild(deleteBtn);
+
+            body.appendChild(dragBtn);
+            body.appendChild(info);
+            body.appendChild(actions);
+            card.appendChild(body);
+
+            // Edit click
+            editBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                openEditPageModal(page.id);
+            });
+
+            // Delete click — use touchend + click for reliable mobile
+            var deleteHandler = function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                removePage(page.id).then(function () {
+                    if (state.editMode) {
+                        if (state.pages.length === 0) exitEditMode();
+                        else renderEditGrid();
+                    }
+                });
             };
-            Store.cartItems.push(cartItem);
-            Store.save();
-            toastMsg = `"${planItem.name}" added — $${getItemTotal(cartItem).toFixed(2)}`;
-            break;
+
+            deleteBtn.addEventListener('click', deleteHandler);
+            deleteBtn.addEventListener('touchend', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                deleteHandler(e);
+            });
+
+            els.editGrid.appendChild(card);
+        });
+
+        setupDragAndDrop();
+    }
+
+    // ---- Edit Modal ----
+
+    function openEditPageModal(id) {
+        var page = state.pages.find(function (p) { return p.id === id; });
+        if (!page) return;
+        state.editingPageId = id;
+        els.editPageName.value = page.name;
+        els.editPageUrl.value = page.url;
+        els.editPageModal.classList.add('active');
+        setTimeout(function () { els.editPageName.focus(); els.editPageName.select(); }, 100);
+    }
+
+    function closeEditPageModal() {
+        state.editingPageId = null;
+        els.editPageModal.classList.remove('active');
+    }
+
+    function saveEditPageChanges() {
+        if (!state.editingPageId) return;
+        if (updatePage(state.editingPageId, els.editPageName.value, els.editPageUrl.value)) {
+            closeEditPageModal();
+            if (state.editMode) renderEditGrid();
         }
-        case 'add-cart': {
-            if (price <= 0) { showToast('Please enter a valid price', 'error'); if (priceEl) priceEl.focus(); return; }
-            if (hasDeposit && depositCount <= 0) { showToast('Please enter number of containers', 'error'); if (depositCountEl) depositCountEl.focus(); return; }
+    }
 
-            let planItem = Store.planItems.find(i => i.name.toLowerCase() === name.toLowerCase());
-            if (!planItem) {
-                planItem = { id: Store.generateId(), name: capitalizeFirst(name), category, quantity, createdAt: Date.now() };
-                Store.planItems.push(planItem);
-            } else { planItem.quantity = quantity; }
+    // ---- Drag & Drop ----
 
-            if (isItemInCart(planItem.id)) { showToast(`"${planItem.name}" is already in your cart`, 'info'); closeModal(); return; }
+    function setupDragAndDrop() {
+        var cards = els.editGrid.querySelectorAll('.edit-card');
+        var draggedCard = null;
+        var draggedIndex = -1;
+        var touchActive = false;
+        var touchTarget = null;
+        var longTimer = null;
 
-            const cartItem = {
-                id: Store.generateId(), planId: planItem.id, name: capitalizeFirst(name), category,
-                price, quantity, hasTax, hasDeposit, depositCount: hasDeposit ? depositCount : 0, createdAt: Date.now()
-            };
-            Store.cartItems.push(cartItem);
-            Store.save();
-            toastMsg = `"${capitalizeFirst(name)}" added — $${getItemTotal(cartItem).toFixed(2)}`;
-            break;
-        }
-        case 'edit-cart': {
-            const item = Store.cartItems.find(i => i.id === editingItemId);
-            if (item) {
-                if (price <= 0) { showToast('Please enter a valid price', 'error'); if (priceEl) priceEl.focus(); return; }
-                if (hasDeposit && depositCount <= 0) { showToast('Please enter number of containers', 'error'); if (depositCountEl) depositCountEl.focus(); return; }
+        cards.forEach(function (card) {
+            // Mouse
+            card.setAttribute('draggable', 'true');
 
-                const oldQty = item.quantity;
-                item.name = capitalizeFirst(name); item.price = price; item.quantity = quantity;
-                item.category = category; item.hasTax = hasTax; item.hasDeposit = hasDeposit;
-                item.depositCount = hasDeposit ? depositCount : 0;
-
-                if (item.planId) {
-                    const linked = Store.planItems.find(p => p.id === item.planId);
-                    if (linked) { linked.name = item.name; linked.category = item.category; if (oldQty !== quantity) linked.quantity = quantity; }
+            card.addEventListener('dragstart', function (e) {
+                if (e.target.closest('.delete-btn') || e.target.closest('.edit-btn')) {
+                    e.preventDefault();
+                    return;
                 }
-                Store.save();
-                toastMsg = `"${item.name}" updated`;
+                draggedCard = card;
+                draggedIndex = parseInt(card.dataset.index);
+                card.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', card.dataset.id);
+            });
+
+            card.addEventListener('dragend', function () {
+                card.classList.remove('dragging');
+                cards.forEach(function (c) { c.classList.remove('drag-over'); });
+                draggedCard = null;
+            });
+
+            card.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                if (card !== draggedCard) card.classList.add('drag-over');
+            });
+
+            card.addEventListener('dragleave', function () { card.classList.remove('drag-over'); });
+
+            card.addEventListener('drop', function (e) {
+                e.preventDefault();
+                card.classList.remove('drag-over');
+                if (card === draggedCard || !draggedCard) return;
+                reorderPages(draggedIndex, parseInt(card.dataset.index));
+            });
+
+            // Touch drag
+            card.addEventListener('touchstart', function (e) {
+                if (e.target.closest('.delete-btn') || e.target.closest('.edit-btn')) return;
+
+                if (e.target.closest('.drag-btn')) {
+                    e.preventDefault();
+                    beginTouchDrag(card);
+                    return;
+                }
+
+                longTimer = setTimeout(function () {
+                    beginTouchDrag(card);
+                }, 400);
+            }, { passive: false });
+
+            card.addEventListener('touchmove', function (e) {
+                if (!touchActive) {
+                    clearTimeout(longTimer);
+                    return;
+                }
+                e.preventDefault();
+                var touch = e.touches[0];
+                var el = document.elementFromPoint(touch.clientX, touch.clientY);
+                cards.forEach(function (c) { c.classList.remove('drag-over'); });
+                if (el) {
+                    var tc = el.closest('.edit-card');
+                    if (tc && tc !== draggedCard) {
+                        tc.classList.add('drag-over');
+                        touchTarget = tc;
+                    } else {
+                        touchTarget = null;
+                    }
+                }
+            }, { passive: false });
+
+            card.addEventListener('touchend', function (e) {
+                clearTimeout(longTimer);
+                if (!touchActive) return;
+                // Prevent this from triggering button clicks
+                e.preventDefault();
+                touchActive = false;
+                if (draggedCard) draggedCard.classList.remove('dragging');
+                cards.forEach(function (c) { c.classList.remove('drag-over'); });
+                if (touchTarget && touchTarget !== draggedCard) {
+                    reorderPages(draggedIndex, parseInt(touchTarget.dataset.index));
+                }
+                draggedCard = null;
+                touchTarget = null;
+            });
+
+            card.addEventListener('touchcancel', function () {
+                clearTimeout(longTimer);
+                touchActive = false;
+                if (draggedCard) draggedCard.classList.remove('dragging');
+                cards.forEach(function (c) { c.classList.remove('drag-over'); });
+                draggedCard = null;
+                touchTarget = null;
+            });
+
+            function beginTouchDrag(src) {
+                touchActive = true;
+                draggedCard = src;
+                draggedIndex = parseInt(src.dataset.index);
+                src.classList.add('dragging');
+                if (navigator.vibrate) navigator.vibrate(30);
             }
-            break;
-        }
+        });
     }
 
-    closeModal();
-    resetPlanSearch();
-    resetCartSearch();
+    function reorderPages(from, to) {
+        if (from === to) return;
+        var m = state.pages.splice(from, 1)[0];
+        state.pages.splice(to, 0, m);
+        saveState();
+        renderEditGrid();
+        showToast('Order updated');
+    }
 
-    setTimeout(() => {
+    // ---- Init ----
+
+    function init() {
+        loadState();
+        ensureActiveTabPage();
         renderAll();
-        if (toastMsg) showToast(toastMsg, 'success');
-    }, 50);
-}
 
-// ===== CONFIRM =====
-function showConfirm(title, message, callback) {
-    DOM.confirmTitle.textContent = title;
-    DOM.confirmMessage.textContent = message;
-    confirmCallback = callback;
+        els.sidebarTrigger.addEventListener('click', openSidebar);
+        els.sidebarTrigger.addEventListener('touchend', function (e) { e.preventDefault(); openSidebar(); });
+        els.closeSidebar.addEventListener('click', closeSidebar);
+        els.overlay.addEventListener('click', closeSidebar);
 
-    const actions = DOM.confirmOverlay.querySelector('.confirm-actions');
-    actions.innerHTML = `
-        <button class="confirm-btn no" id="confirmNo">Cancel</button>
-        <button class="confirm-btn yes" id="confirmYes">Delete</button>
-    `;
-    actions.querySelector('#confirmNo').addEventListener('click', closeConfirm);
-    actions.querySelector('#confirmYes').addEventListener('click', () => { if (confirmCallback) confirmCallback(); closeConfirm(); });
-    DOM.confirmOverlay.classList.add('show');
-}
+        els.addUrlBtn.addEventListener('click', function () { addPage(els.urlName.value, els.urlInput.value); });
+        els.urlInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') addPage(els.urlName.value, els.urlInput.value); });
+        els.urlName.addEventListener('keydown', function (e) { if (e.key === 'Enter') els.urlInput.focus(); });
 
-function showDeleteChoiceConfirm(title, message, options) {
-    DOM.confirmTitle.textContent = title;
-    DOM.confirmMessage.textContent = message;
-
-    const actions = DOM.confirmOverlay.querySelector('.confirm-actions');
-    actions.innerHTML = `
-        <button class="confirm-btn no" id="confirmCancel">Cancel</button>
-        <button class="confirm-btn choice-single" id="confirmSingle"><i class="fas ${options.planOnly.icon}"></i> ${escapeHtml(options.planOnly.label)}</button>
-        <button class="confirm-btn choice-both" id="confirmBoth"><i class="fas ${options.both.icon}"></i> ${escapeHtml(options.both.label)}</button>
-    `;
-    actions.querySelector('#confirmCancel').addEventListener('click', closeConfirm);
-    actions.querySelector('#confirmSingle').addEventListener('click', () => { options.planOnly.callback(); closeConfirm(); });
-    actions.querySelector('#confirmBoth').addEventListener('click', () => { options.both.callback(); closeConfirm(); });
-    DOM.confirmOverlay.classList.add('show');
-}
-
-function showClearChoiceConfirm() {
-    DOM.confirmTitle.textContent = 'Clear Items';
-    DOM.confirmMessage.textContent = 'What would you like to clear?';
-
-    const actions = DOM.confirmOverlay.querySelector('.confirm-actions');
-    const hasPlan = Store.planItems.length > 0;
-    const hasCart = Store.cartItems.length > 0;
-
-    actions.innerHTML = `
-        <button class="confirm-btn no" id="confirmCancel">Cancel</button>
-        ${hasPlan ? '<button class="confirm-btn choice-single" id="confirmClearPlan"><i class="fas fa-clipboard-list"></i> Clear Plan List</button>' : ''}
-        ${hasCart ? '<button class="confirm-btn choice-single" id="confirmClearCart"><i class="fas fa-cart-shopping"></i> Clear Shopping Cart</button>' : ''}
-        ${hasPlan && hasCart ? '<button class="confirm-btn choice-both" id="confirmClearBoth"><i class="fas fa-trash-can"></i> Clear Both</button>' : ''}
-    `;
-
-    actions.querySelector('#confirmCancel').addEventListener('click', closeConfirm);
-
-    const cp = actions.querySelector('#confirmClearPlan');
-    if (cp) cp.addEventListener('click', () => {
-        closeConfirm();
-        showConfirm('Clear Plan List?', 'Remove all items from your plan list? Cart items will be unlinked but kept.', () => {
-            Store.cartItems.forEach(c => { if (c.planId) c.planId = null; });
-            Store.planItems = []; Store.save(); renderAll();
-            showToast('Plan list cleared', 'success');
+        els.editModeBtn.addEventListener('click', function () {
+            if (state.pages.length === 0) { showToast('Add some websites first', 'error'); return; }
+            enterEditMode();
         });
-    });
 
-    const cc = actions.querySelector('#confirmClearCart');
-    if (cc) cc.addEventListener('click', () => {
-        closeConfirm();
-        showConfirm('Clear Shopping Cart?', 'Remove all items from your shopping cart? Plan items will be kept.', () => {
-            Store.cartItems = []; Store.save(); renderAll();
-            showToast('Shopping cart cleared', 'success');
+        els.doneEditBtn.addEventListener('click', exitEditMode);
+        els.closeEditModal.addEventListener('click', closeEditPageModal);
+        els.cancelEditPage.addEventListener('click', closeEditPageModal);
+        els.saveEditPage.addEventListener('click', saveEditPageChanges);
+        els.editPageModal.addEventListener('click', function (e) { if (e.target === els.editPageModal) closeEditPageModal(); });
+        els.editPageName.addEventListener('keydown', function (e) { if (e.key === 'Enter') els.editPageUrl.focus(); });
+        els.editPageUrl.addEventListener('keydown', function (e) { if (e.key === 'Enter') saveEditPageChanges(); });
+
+        // Tab arrows
+        els.tabArrowLeft.addEventListener('click', function () {
+            if (state.tabPage > 0) { state.tabPage--; renderTabs(); }
         });
-    });
-
-    const cb = actions.querySelector('#confirmClearBoth');
-    if (cb) cb.addEventListener('click', () => {
-        closeConfirm();
-        showConfirm('Clear Everything?', 'Remove ALL items from both your plan and cart? This cannot be undone.', () => {
-            Store.planItems = []; Store.cartItems = []; Store.save(); renderAll();
-            showToast('All items cleared', 'success');
+        els.tabArrowRight.addEventListener('click', function () {
+            if (state.tabPage < getMaxTabPage()) { state.tabPage++; renderTabs(); }
         });
-    });
 
-    DOM.confirmOverlay.classList.add('show');
-}
+        // Recalc tabs on resize
+        var resizeTimer;
+        window.addEventListener('resize', function () {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function () {
+                clampTabPage();
+                renderTabs();
+            }, 150);
+        });
 
-function closeConfirm() {
-    DOM.confirmOverlay.classList.remove('show');
-    confirmCallback = null;
-}
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                if (els.editPageModal.classList.contains('active')) closeEditPageModal();
+                else if (state.editMode) exitEditMode();
+                else if (state.sidebarOpen) closeSidebar();
+            }
+        });
+    }
 
-// ===== TOAST =====
-function showToast(message, type) {
-    type = type || 'info';
-    const toast = document.createElement('div');
-    toast.className = 'toast ' + type;
-    const icons = { success: 'fa-circle-check', error: 'fa-circle-exclamation', info: 'fa-circle-info' };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
 
-    toast.innerHTML = `
-        <div class="toast-icon"><i class="fas ${icons[type] || icons.info}"></i></div>
-        <div class="toast-message">${escapeHtml(message)}</div>
-        <button class="toast-close"><i class="fas fa-xmark"></i></button>
-    `;
-
-    toast.querySelector('.toast-close').addEventListener('click', () => removeToast(toast));
-    DOM.toastContainer.appendChild(toast);
-    setTimeout(() => removeToast(toast), 900);
-}
-
-function removeToast(toast) {
-    if (!toast.parentNode) return;
-    toast.classList.add('removing');
-    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300);
-}
-
-// ===== START =====
-document.addEventListener('DOMContentLoaded', init);
+})();
