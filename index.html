@@ -8,7 +8,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="icon" type="image/svg+xml" href="images/favi.png">
-
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="CartMaster">
@@ -26,13 +25,13 @@
                 <span>Cart<strong>Master</strong></span>
             </div>
             <div class="header-right">
-                <button class="icon-btn" id="settingsBtn" title="Settings">
+                <button class="icon-btn" id="settingsBtn" title="Settings" type="button">
                     <i class="fas fa-gear"></i>
                 </button>
-                <button class="icon-btn" id="sortBtn" title="Sort Options">
+                <button class="icon-btn" id="sortBtn" title="Sort Options" type="button">
                     <i class="fas fa-arrow-down-a-z"></i>
                 </button>
-                <button class="icon-btn" id="clearAllBtn" title="Clear All">
+                <button class="icon-btn" id="clearAllBtn" title="Clear All" type="button">
                     <i class="fas fa-trash-can"></i>
                 </button>
                 <div class="total-badge" id="headerTotal">
@@ -46,12 +45,12 @@
 
     <nav class="tab-nav">
         <div class="tab-nav-inner">
-            <button class="tab-btn active" data-tab="planning">
+            <button class="tab-btn active" data-tab="planning" type="button">
                 <i class="fas fa-clipboard-list"></i>
                 <span>Plan List</span>
                 <span class="tab-count" id="planCount">0</span>
             </button>
-            <button class="tab-btn" data-tab="shopping">
+            <button class="tab-btn" data-tab="shopping" type="button">
                 <i class="fas fa-basket-shopping"></i>
                 <span>Shopping Cart</span>
                 <span class="tab-count" id="cartCount">0</span>
@@ -65,41 +64,41 @@
             <div class="search-bar">
                 <i class="fas fa-magnifying-glass"></i>
                 <input type="text" id="planSearchInput" placeholder="Search or add new item..." autocomplete="off">
-                <button class="search-clear" id="planSearchClear">
+                <button class="search-clear" id="planSearchClear" type="button">
                     <i class="fas fa-xmark"></i>
                 </button>
             </div>
-            <button class="add-btn" id="addPlanItemBtn">
+            <button class="add-btn" id="addPlanItemBtn" type="button">
                 <i class="fas fa-plus"></i>
             </button>
         </div>
 
         <div class="quick-categories" id="catScroller">
-            <button class="cat-chip active" data-category="all">
+            <button class="cat-chip active" data-category="all" type="button">
                 <i class="fas fa-border-all"></i> All
             </button>
-            <button class="cat-chip" data-category="produce">
+            <button class="cat-chip" data-category="produce" type="button">
                 <i class="fas fa-apple-whole"></i> Produce
             </button>
-            <button class="cat-chip" data-category="dairy">
+            <button class="cat-chip" data-category="dairy" type="button">
                 <i class="fas fa-cheese"></i> Dairy
             </button>
-            <button class="cat-chip" data-category="meat">
+            <button class="cat-chip" data-category="meat" type="button">
                 <i class="fas fa-drumstick-bite"></i> Meat
             </button>
-            <button class="cat-chip" data-category="bakery">
+            <button class="cat-chip" data-category="bakery" type="button">
                 <i class="fas fa-bread-slice"></i> Bakery
             </button>
-            <button class="cat-chip" data-category="beverages">
+            <button class="cat-chip" data-category="beverages" type="button">
                 <i class="fas fa-mug-hot"></i> Drinks
             </button>
-            <button class="cat-chip" data-category="frozen">
+            <button class="cat-chip" data-category="frozen" type="button">
                 <i class="fas fa-snowflake"></i> Frozen
             </button>
-            <button class="cat-chip" data-category="snacks">
+            <button class="cat-chip" data-category="snacks" type="button">
                 <i class="fas fa-cookie-bite"></i> Snacks
             </button>
-            <button class="cat-chip" data-category="other">
+            <button class="cat-chip" data-category="other" type="button">
                 <i class="fas fa-ellipsis"></i> Other
             </button>
         </div>
@@ -113,11 +112,11 @@
             <div class="search-bar">
                 <i class="fas fa-magnifying-glass"></i>
                 <input type="text" id="cartSearchInput" placeholder="Search planned items to add..." autocomplete="off">
-                <button class="search-clear" id="cartSearchClear">
+                <button class="search-clear" id="cartSearchClear" type="button">
                     <i class="fas fa-xmark"></i>
                 </button>
             </div>
-            <button class="add-btn" id="addCartItemBtn" title="Add new item">
+            <button class="add-btn" id="addCartItemBtn" title="Add new item" type="button">
                 <i class="fas fa-plus"></i>
             </button>
         </div>
@@ -159,14 +158,14 @@
         <div class="modal" id="modal">
             <div class="modal-header">
                 <h2 id="modalTitle">Add Item</h2>
-                <button class="modal-close" id="modalClose">
+                <button class="modal-close" id="modalClose" type="button">
                     <i class="fas fa-xmark"></i>
                 </button>
             </div>
             <div class="modal-body" id="modalBody"></div>
             <div class="modal-footer" id="modalFooter">
-                <button class="btn btn-secondary" id="modalCancel">Cancel</button>
-                <button class="btn btn-primary" id="modalConfirm">
+                <button class="btn btn-secondary" id="modalCancel" type="button">Cancel</button>
+                <button class="btn btn-primary" id="modalConfirm" type="button">
                     <i class="fas fa-check"></i> Confirm
                 </button>
             </div>
@@ -181,9 +180,9 @@
             </div>
             <h3 id="confirmTitle">Are you sure?</h3>
             <p id="confirmMessage">This action cannot be undone.</p>
-            <div class="confirm-actions">
-                <button class="btn btn-secondary" id="confirmNo">Cancel</button>
-                <button class="btn btn-danger" id="confirmYes">Delete</button>
+            <div class="confirm-actions" id="confirmActions">
+                <button class="btn btn-secondary" id="confirmNo" type="button">Cancel</button>
+                <button class="btn btn-danger" id="confirmYes" type="button">Delete</button>
             </div>
         </div>
     </div>

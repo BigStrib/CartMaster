@@ -64,7 +64,6 @@
 html {
     font-size: 16px;
     -webkit-text-size-adjust: 100%;
-    -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -76,11 +75,20 @@ body {
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
 }
 
 input, button, select, textarea {
     font-family: inherit;
     font-size: inherit;
+    -webkit-tap-highlight-color: transparent;
+}
+
+button {
+    touch-action: manipulation;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 /* ===== HIDE ALL SCROLLBARS ===== */
@@ -166,23 +174,15 @@ input[type="number"] {
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    transition: all var(--transition-fast);
     font-size: 0.9rem;
-}
-
-.icon-btn:hover {
-    background: var(--bg-elevated);
-    color: var(--text-primary);
+    position: relative;
+    z-index: 1;
 }
 
 .icon-btn:active {
+    background: var(--bg-elevated);
+    color: var(--text-primary);
     transform: scale(0.92);
-}
-
-#settingsBtn:hover {
-    background: var(--red-subtle);
-    color: var(--red-light);
 }
 
 .total-badge {
@@ -230,12 +230,12 @@ input[type="number"] {
     background: none;
     color: var(--text-secondary);
     font-size: 0.875rem;
-    cursor: pointer;
-    transition: all var(--transition-fast);
     text-align: left;
+    touch-action: manipulation;
+    cursor: pointer;
 }
 
-.sort-option:hover {
+.sort-option:active {
     background: var(--red-subtle);
     color: var(--red-light);
 }
@@ -283,9 +283,8 @@ input[type="number"] {
     color: var(--text-tertiary);
     font-size: 0.85rem;
     font-weight: 600;
-    cursor: pointer;
     position: relative;
-    transition: all var(--transition-normal);
+    transition: color var(--transition-normal);
     padding: 0 12px;
 }
 
@@ -312,6 +311,11 @@ input[type="number"] {
 
 .tab-btn i {
     font-size: 1rem;
+    pointer-events: none;
+}
+
+.tab-btn span {
+    pointer-events: none;
 }
 
 .tab-count {
@@ -324,6 +328,7 @@ input[type="number"] {
     min-width: 20px;
     text-align: center;
     transition: all var(--transition-fast);
+    pointer-events: none;
 }
 
 .tab-btn.active .tab-count {
@@ -371,7 +376,7 @@ input[type="number"] {
     border-radius: var(--radius-md);
     padding: 0 14px;
     height: 48px;
-    transition: all var(--transition-fast);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .search-bar:focus-within {
@@ -383,6 +388,7 @@ input[type="number"] {
     color: var(--text-tertiary);
     font-size: 0.9rem;
     flex-shrink: 0;
+    pointer-events: none;
 }
 
 .search-bar input {
@@ -404,14 +410,12 @@ input[type="number"] {
     border: none;
     background: var(--bg-elevated);
     color: var(--text-tertiary);
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
-    cursor: pointer;
     align-items: center;
     justify-content: center;
     font-size: 0.7rem;
-    transition: all var(--transition-fast);
     flex-shrink: 0;
 }
 
@@ -419,7 +423,7 @@ input[type="number"] {
     display: flex;
 }
 
-.search-clear:hover {
+.search-clear:active {
     background: var(--red-primary);
     color: white;
 }
@@ -434,20 +438,20 @@ input[type="number"] {
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
     font-size: 1.1rem;
-    transition: all var(--transition-fast);
     box-shadow: var(--shadow-glow);
     flex-shrink: 0;
-}
-
-.add-btn:hover {
-    background: linear-gradient(135deg, var(--red-secondary), var(--red-accent));
-    transform: scale(1.05);
+    position: relative;
+    z-index: 1;
 }
 
 .add-btn:active {
     transform: scale(0.95);
+    background: linear-gradient(135deg, var(--red-secondary), var(--red-accent));
+}
+
+.add-btn i {
+    pointer-events: none;
 }
 
 /* ===== CATEGORIES ===== */
@@ -461,7 +465,6 @@ input[type="number"] {
     -webkit-overflow-scrolling: touch;
     background: var(--bg-primary);
     border-bottom: 1px solid var(--border-color);
-    cursor: grab;
     user-select: none;
     -webkit-user-select: none;
     touch-action: pan-x;
@@ -470,10 +473,6 @@ input[type="number"] {
     max-width: var(--content-max-width);
     width: 100%;
     margin: 0 auto;
-}
-
-.quick-categories.dragging {
-    cursor: grabbing;
 }
 
 .cat-chip {
@@ -487,13 +486,11 @@ input[type="number"] {
     border-radius: var(--radius-full);
     font-size: 0.78rem;
     font-weight: 600;
-    cursor: pointer;
     white-space: nowrap;
-    transition: all var(--transition-fast);
     flex-shrink: 0;
 }
 
-.cat-chip:hover {
+.cat-chip:active {
     border-color: var(--red-primary);
     color: var(--text-primary);
 }
@@ -506,6 +503,7 @@ input[type="number"] {
 
 .cat-chip i {
     font-size: 0.75rem;
+    pointer-events: none;
 }
 
 /* ===== LIST CONTAINER ===== */
@@ -589,11 +587,10 @@ input[type="number"] {
     border-radius: var(--radius-md);
     padding: 14px;
     margin-bottom: 8px;
-    cursor: pointer;
-    transition: all var(--transition-normal);
-    animation: slideIn 0.3s ease forwards;
     position: relative;
     overflow: hidden;
+    animation: slideIn 0.3s ease forwards;
+    touch-action: manipulation;
 }
 
 .list-item::before {
@@ -649,16 +646,10 @@ input[type="number"] {
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    transition: all var(--transition-fast);
     flex-shrink: 0;
     color: transparent;
     font-size: 0.7rem;
-}
-
-.item-check:hover {
-    border-color: var(--red-accent);
-    background: var(--red-subtle);
+    transition: all var(--transition-fast);
 }
 
 .item-check.checked {
@@ -669,7 +660,10 @@ input[type="number"] {
 }
 
 .item-check.locked {
-    cursor: default;
+    pointer-events: none;
+}
+
+.item-check i {
     pointer-events: none;
 }
 
@@ -677,6 +671,7 @@ input[type="number"] {
 .item-info {
     flex: 1;
     min-width: 0;
+    pointer-events: none;
 }
 
 .item-name {
@@ -754,6 +749,7 @@ input[type="number"] {
     gap: 2px;
     margin-right: 4px;
     flex-shrink: 0;
+    pointer-events: none;
 }
 
 .item-price {
@@ -773,8 +769,8 @@ input[type="number"] {
 
 /* ===== ITEM ACTION BUTTONS ===== */
 .item-action-btn {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border: none;
     background: var(--bg-tertiary);
     color: var(--text-tertiary);
@@ -782,23 +778,26 @@ input[type="number"] {
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    font-size: 0.75rem;
-    transition: all var(--transition-fast);
+    font-size: 0.8rem;
     flex-shrink: 0;
+    position: relative;
+    z-index: 5;
 }
 
-.item-action-btn:hover {
-    background: var(--bg-elevated);
-    color: var(--text-primary);
+.item-action-btn i {
+    pointer-events: none;
 }
 
-.item-action-btn.edit:hover {
+.item-action-btn:active {
+    transform: scale(0.9);
+}
+
+.item-action-btn.edit:active {
     color: var(--info);
     background: rgba(52, 152, 219, 0.1);
 }
 
-.item-action-btn.delete:hover {
+.item-action-btn.delete:active {
     color: var(--danger);
     background: rgba(231, 76, 60, 0.1);
 }
@@ -809,15 +808,16 @@ input[type="number"] {
     flex-shrink: 0;
 }
 
-.item-action-btn.send:hover {
+.item-action-btn.send:active {
     color: var(--success);
-    background: rgba(39, 174, 96, 0.2);
+    background: rgba(39, 174, 96, 0.25);
+    transform: scale(0.9);
 }
 
 /* ===== ITEM ACTIONS ===== */
 .item-actions {
     display: flex;
-    gap: 4px;
+    gap: 6px;
     opacity: 0;
     pointer-events: none;
     transform: translateX(6px);
@@ -878,7 +878,7 @@ input[type="number"] {
     gap: 12px;
     padding: 12px 14px;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    touch-action: manipulation;
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -886,7 +886,7 @@ input[type="number"] {
     border-bottom: none;
 }
 
-.search-result-item:hover {
+.search-result-item:active {
     background: var(--red-subtle);
 }
 
@@ -940,16 +940,16 @@ input[type="number"] {
     font-size: 0.82rem;
     font-weight: 500;
     cursor: pointer;
+    touch-action: manipulation;
     display: flex;
     align-items: center;
     gap: 8px;
     background: var(--red-subtle);
-    transition: background var(--transition-fast);
     border-radius: var(--radius-sm);
     margin-bottom: 8px;
 }
 
-.search-add-hint:hover {
+.search-add-hint:active {
     background: rgba(139, 26, 26, 0.18);
 }
 
@@ -957,6 +957,7 @@ input[type="number"] {
     color: var(--red-accent);
     font-size: 0.85rem;
     flex-shrink: 0;
+    pointer-events: none;
 }
 
 .search-add-hint kbd {
@@ -976,10 +977,10 @@ input[type="number"] {
     text-align: center;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: background var(--transition-fast);
+    touch-action: manipulation;
 }
 
-.search-empty-hint:hover {
+.search-empty-hint:active {
     background: var(--red-subtle);
 }
 
@@ -1154,6 +1155,7 @@ input[type="number"] {
     max-width: 520px;
     max-height: 85vh;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     transform: translateY(100%);
     transition: transform var(--transition-smooth);
     box-shadow: var(--shadow-xl);
@@ -1191,12 +1193,14 @@ input[type="number"] {
     display: flex;
     align-items: center;
     justify-content: center;
-    cursor: pointer;
-    transition: all var(--transition-fast);
     font-size: 0.9rem;
 }
 
-.modal-close:hover {
+.modal-close i {
+    pointer-events: none;
+}
+
+.modal-close:active {
     background: var(--danger);
     color: white;
 }
@@ -1238,7 +1242,9 @@ input[type="number"] {
     color: var(--text-primary);
     font-size: 0.95rem;
     outline: none;
-    transition: all var(--transition-fast);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .form-input:focus {
@@ -1276,12 +1282,12 @@ input[type="number"] {
     font-size: 0.95rem;
     outline: none;
     cursor: pointer;
-    transition: all var(--transition-fast);
     appearance: none;
     -webkit-appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23707070' d='M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 14px center;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .form-select:focus {
@@ -1345,16 +1351,16 @@ input[type="number"] {
     align-items: center;
     gap: 12px;
     cursor: pointer;
+    touch-action: manipulation;
     padding: 12px 14px;
     background: var(--bg-tertiary);
     border: 1.5px solid var(--border-color);
     border-radius: var(--radius-sm);
-    transition: all var(--transition-fast);
     user-select: none;
     -webkit-user-select: none;
 }
 
-.custom-checkbox:hover {
+.custom-checkbox:active {
     border-color: var(--red-primary);
     background: var(--red-subtle);
 }
@@ -1416,6 +1422,7 @@ input[type="number"] {
     align-items: center;
     gap: 6px;
     transition: color var(--transition-fast);
+    pointer-events: none;
 }
 
 .custom-checkbox:has(input:checked) .checkbox-label {
@@ -1466,17 +1473,22 @@ input[type="number"] {
     border-radius: var(--radius-sm);
     font-size: 0.9rem;
     font-weight: 700;
-    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    transition: all var(--transition-fast);
     flex: 1;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .btn:active {
     transform: scale(0.96);
+}
+
+.btn i {
+    pointer-events: none;
 }
 
 .btn-primary {
@@ -1485,7 +1497,7 @@ input[type="number"] {
     box-shadow: var(--shadow-glow);
 }
 
-.btn-primary:hover {
+.btn-primary:active {
     background: linear-gradient(135deg, var(--red-secondary), var(--red-accent));
 }
 
@@ -1495,7 +1507,7 @@ input[type="number"] {
     border: 1px solid var(--border-color);
 }
 
-.btn-secondary:hover {
+.btn-secondary:active {
     background: var(--bg-elevated);
     color: var(--text-primary);
 }
@@ -1505,32 +1517,11 @@ input[type="number"] {
     color: white;
 }
 
-.btn-danger:hover {
+.btn-danger:active {
     background: #c0392b;
 }
 
 /* ===== CONFIRM MODAL ===== */
-.confirm-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    z-index: 3000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    opacity: 0;
-    visibility: hidden;
-    transition: all var(--transition-normal);
-}
-
-.confirm-overlay.show {
-    opacity: 1;
-    visibility: visible;
-}
-
 .confirm-modal {
     background: var(--bg-card);
     border: 1px solid var(--border-light);
@@ -1539,12 +1530,17 @@ input[type="number"] {
     text-align: center;
     width: 100%;
     max-width: 380px;
+    margin: 20px;
     box-shadow: var(--shadow-xl);
     transform: scale(0.9);
     transition: transform var(--transition-smooth);
 }
 
-.confirm-overlay.show .confirm-modal {
+#confirmOverlay {
+    align-items: center;
+}
+
+#confirmOverlay.show .confirm-modal {
     transform: scale(1);
 }
 
@@ -1587,12 +1583,17 @@ input[type="number"] {
     border-radius: var(--radius-sm);
     font-size: 0.875rem;
     font-weight: 700;
-    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    transition: all var(--transition-fast);
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.confirm-btn i {
+    pointer-events: none;
 }
 
 .confirm-btn:active {
@@ -1605,7 +1606,7 @@ input[type="number"] {
     border: 1px solid var(--border-color);
 }
 
-.confirm-btn.no:hover {
+.confirm-btn.no:active {
     background: var(--bg-elevated);
     color: var(--text-primary);
 }
@@ -1616,11 +1617,11 @@ input[type="number"] {
     box-shadow: 0 0 14px rgba(231, 76, 60, 0.3);
 }
 
-.confirm-btn.yes:hover {
+.confirm-btn.yes:active {
     background: linear-gradient(135deg, #c0392b, #a93226);
 }
 
-.confirm-actions:has(.choice-single) {
+.confirm-actions.stacked {
     flex-direction: column;
     gap: 8px;
 }
@@ -1634,9 +1635,8 @@ input[type="number"] {
     font-size: 0.85rem;
 }
 
-.confirm-btn.choice-single:hover {
+.confirm-btn.choice-single:active {
     background: rgba(243, 156, 18, 0.1);
-    color: var(--warning);
 }
 
 .confirm-btn.choice-both {
@@ -1649,14 +1649,13 @@ input[type="number"] {
     box-shadow: 0 0 14px rgba(231, 76, 60, 0.3);
 }
 
-.confirm-btn.choice-both:hover {
+.confirm-btn.choice-both:active {
     background: linear-gradient(135deg, #c0392b, #a93226);
 }
 
-.confirm-actions:has(.choice-single) .confirm-btn.no {
+.confirm-actions.stacked .confirm-btn.no {
     flex: none;
     width: 100%;
-    order: -1;
 }
 
 /* ===== TOAST NOTIFICATIONS ===== */
@@ -1700,7 +1699,7 @@ input[type="number"] {
     left: 0;
     height: 3px;
     background: var(--red-accent);
-    animation: toastTimer 0.9s linear forwards;
+    animation: toastTimer 1.5s linear forwards;
 }
 
 .toast.success::after { background: var(--success); }
@@ -1759,14 +1758,17 @@ input[type="number"] {
     border: none;
     background: none;
     color: var(--text-tertiary);
-    cursor: pointer;
-    padding: 4px;
+    padding: 8px;
     font-size: 0.8rem;
-    transition: color var(--transition-fast);
     flex-shrink: 0;
+    touch-action: manipulation;
 }
 
-.toast-close:hover {
+.toast-close i {
+    pointer-events: none;
+}
+
+.toast-close:active {
     color: var(--text-primary);
 }
 
@@ -1774,7 +1776,6 @@ input[type="number"] {
    RESPONSIVE BREAKPOINTS
    ========================================================= */
 
-/* ===== SMALL PHONES ===== */
 @media (max-width: 360px) {
     .tab-btn span:not(.tab-count) {
         font-size: 0.75rem;
@@ -1790,9 +1791,9 @@ input[type="number"] {
     }
 
     .item-action-btn {
-        width: 28px;
-        height: 28px;
-        font-size: 0.65rem;
+        width: 32px;
+        height: 32px;
+        font-size: 0.7rem;
     }
 
     .settings-section {
@@ -1819,7 +1820,6 @@ input[type="number"] {
     }
 }
 
-/* ===== LANDSCAPE PHONE ===== */
 @media (max-height: 500px) and (orientation: landscape) {
     :root {
         --header-height: 48px;
@@ -1893,7 +1893,6 @@ input[type="number"] {
     .deposit-count-wrap { padding: 10px 12px; }
 }
 
-/* ===== TABLET ===== */
 @media (min-width: 768px) {
     :root { --header-height: 64px; }
 
@@ -1982,12 +1981,12 @@ input[type="number"] {
     .item-price { font-size: 1.1rem; margin-right: 8px; }
 
     .item-action-btn {
-        width: 36px;
-        height: 36px;
-        font-size: 0.8rem;
+        width: 38px;
+        height: 38px;
+        font-size: 0.85rem;
     }
 
-    .item-actions { gap: 6px; }
+    .item-actions { gap: 8px; }
 
     .cart-scroll-area .cart-summary {
         margin: 12px auto;
@@ -2056,7 +2055,6 @@ input[type="number"] {
     .item-tag { font-size: 0.65rem; padding: 2px 7px; }
 }
 
-/* ===== DESKTOP ===== */
 @media (min-width: 1024px) {
     :root {
         --header-height: 68px;
@@ -2083,13 +2081,10 @@ input[type="number"] {
     .item-price { font-size: 1.15rem; margin-right: 12px; }
 
     .item-action-btn {
-        width: 38px;
-        height: 38px;
-        font-size: 0.85rem;
-        border-radius: var(--radius-sm);
+        width: 40px;
+        height: 40px;
+        font-size: 0.88rem;
     }
-
-    .item-actions { gap: 8px; }
 
     .cart-scroll-area .cart-summary {
         padding-left: 0;
@@ -2115,18 +2110,11 @@ input[type="number"] {
     }
 }
 
-/* ===== WIDE DESKTOP ===== */
 @media (min-width: 1440px) {
     :root { --content-max-width: 1040px; }
 
     .app-header { padding: 0 48px; }
     .list-item { padding: 20px 24px; }
-
-    .item-action-btn {
-        width: 40px;
-        height: 40px;
-        font-size: 0.88rem;
-    }
 
     .confirm-modal {
         max-width: 420px;
@@ -2136,7 +2124,6 @@ input[type="number"] {
     .toast-container { max-width: 480px; }
 }
 
-/* ===== ULTRAWIDE ===== */
 @media (min-width: 1920px) {
     :root {
         --content-max-width: 1100px;
